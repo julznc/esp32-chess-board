@@ -20,7 +20,7 @@ def main(fn, id):
         print("0b", end='')
 
       bit = '0'
-      if x < image.width and image.getpixel((x,y)) != 0:
+      if x < image.width and image.getpixel((x,y))[0] != 0:
         bit = '1'
       print(bit, end='')
 
