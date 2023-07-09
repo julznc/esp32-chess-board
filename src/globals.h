@@ -10,7 +10,7 @@
 #define K_APP_NAME                  "Electronic Chess Board"
 #define K_FW_VER_MAJOR              (0)
 #define K_FW_VER_MINOR              (1)
-#define K_FW_VER_TEST               (1)
+#define K_FW_VER_TEST               (2)
 
 
 // for esp32-s2: RX1=18, TX1=17
@@ -20,6 +20,7 @@
 // pinouts
 #define I2C_SDA_PIN                 (9)
 #define I2C_SCL_PIN                 (10)
+#define LED_STRIP_PIN               (21)
 
 
 // set "CORE_DEBUG_LEVEL" build flag, and call "<hwserial>.setDebugOutput(true)"

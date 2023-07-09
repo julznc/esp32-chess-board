@@ -110,6 +110,8 @@ public:
   ~Adafruit_SH1106G(void);
 
   bool begin(uint8_t i2caddr = 0x3C, bool reset = true);
+  bool init(void);
+  void splash(void);
 };
 
 /*!

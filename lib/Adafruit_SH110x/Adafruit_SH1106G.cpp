@@ -139,11 +139,11 @@ bool Adafruit_SH1106G::begin(uint8_t addr, bool reset) {
   _page_start_offset =
       2; // the SH1106 display we have found requires a small offset into memory
 
-#ifndef SH110X_NO_SPLASH
-  drawBitmap((WIDTH - splash1_width) / 2, (HEIGHT - splash1_height) / 2,
-             splash1_data, splash1_width, splash1_height, 1);
-#endif
+  return true;
+}
 
+bool Adafruit_SH1106G::init(void)
+{
   // Init sequence, make sure its under 32 bytes, or split into multiples!
   // clang-format off
   static const uint8_t init[] = {
@@ -173,5 +173,15 @@ bool Adafruit_SH1106G::begin(uint8_t addr, bool reset) {
   delay(100);                     // 100ms delay recommended
   oled_command(SH110X_DISPLAYON); // 0xaf
 
+  clearDisplay();
+
   return true; // Success
+}
+
+void Adafruit_SH1106G::splash(void)
+{
+#ifndef SH110X_NO_SPLASH
+  drawBitmap((WIDTH - splash1_width) / 2, (HEIGHT - splash1_height) / 2,
+             splash1_data, splash1_width, splash1_height, 1);
+#endif
 }
