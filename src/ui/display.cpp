@@ -2,6 +2,9 @@
 #include "globals.h"
 #include "display.h"
 
+#include <Fonts/FreeSans9pt7b.h>
+//#include <Fonts/FreeSansBold9pt7b.h>
+
 
 namespace ui::display
 {
@@ -9,6 +12,8 @@ namespace ui::display
 
 Adafruit_SH1106G oled(SCREEN_WIDTH, SCREEN_HEIGHT);
 SemaphoreHandle_t mtx = NULL;
+const GFXfont *font2 = &FreeSans9pt7b;
+//const GFXfont *font2 = &FreeSansBold9pt7b;
 
 
 bool init(void)
@@ -28,6 +33,9 @@ bool init(void)
     }
     else
     {
+        oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
+        oled.cp437(true);
+
         oled.splash();
         oled.display();
         LOGD("OLED ok");

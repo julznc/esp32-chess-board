@@ -21,6 +21,10 @@ static void cycle(void)
         }
         else
         {
+            delay(3*1000UL);
+            DISPLAY_CLEAR();
+            DISPLAY_TEXT2(0, 10, "e-Board %02x.%02x", K_FW_VER_MAJOR, K_FW_VER_MINOR);
+
             e_state = UI_STATE_IDLE;
         }
         break;
