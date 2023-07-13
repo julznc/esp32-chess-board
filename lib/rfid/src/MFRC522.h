@@ -269,7 +269,7 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////////
 	// Functions for setting up the Arduino
 	/////////////////////////////////////////////////////////////////////////////////////
-	MFRC522(SPIClass& spi, byte chipSelectPin, byte resetPowerDownPin=UNUSED_PIN);
+	MFRC522(SPIClass& spi, byte chipSelectPin, byte resetPowerDownPin, bool invertedChipSelect=false, bool invertedReset=false);
 
 	/////////////////////////////////////////////////////////////////////////////////////
 	// Basic interface functions for communicating with the MFRC522
@@ -287,7 +287,7 @@ public:
 	// Functions for manipulating the MFRC522
 	/////////////////////////////////////////////////////////////////////////////////////
 	void PCD_Init();
-	void PCF_HardReset(bool inverted=false);
+	void PCF_HardReset();
 	void PCD_Reset(); // soft-reset
 	void PCD_AntennaOn();
 	void PCD_AntennaOff();
@@ -364,6 +364,12 @@ protected:
 	SPIClass& _spi;
 	byte _chipSelectPin;		// Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
 	byte _resetPowerDownPin;	// Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low)
+	bool _invertedCS;
+	bool _invertedRst;
+
+	inline void _select()   { digitalWrite(_chipSelectPin, _invertedCS ? HIGH : LOW ); }
+	inline void _unselect() { digitalWrite(_chipSelectPin, _invertedCS ? LOW  : HIGH); }
+
 	StatusCode MIFARE_TwoStepHelper(byte command, byte blockAddr, int32_t data);
 };
 

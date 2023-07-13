@@ -9,18 +9,39 @@
 // app firmware info
 #define K_APP_NAME                  "Electronic Chess Board"
 #define K_FW_VER_MAJOR              (0)
-#define K_FW_VER_MINOR              (1)
-#define K_FW_VER_TEST               (3)
+#define K_FW_VER_MINOR              (2)
+#define K_FW_VER_TEST               (1)
 
 
 // for esp32-s2: RX1=18, TX1=17
 #define HWSERIAL                    Serial1
 #define PRINTF                      HWSERIAL.printf
 
-// pinouts
+/*** PIN OUTS ***/
+
+// UI
 #define I2C_SDA_PIN                 (9)
 #define I2C_SCL_PIN                 (10)
 #define LED_STRIP_PIN               (21)
+
+// spi bus
+#define RFID_SPI_BUS                HSPI // SPI2
+#define RFID_MISO_PIN               (33)
+#define RFID_MOSI_PIN               (34)
+#define RFID_SCK_PIN                (35)
+#define RFID_SS_PIN                 (1)     // active high (inverted)
+#define RFID_RST_PIN                (5)     // active low
+
+// multiplexed via HC238
+#define RFID_RST_A_PIN              (8)
+#define RFID_RST_B_PIN              (7)
+#define RFID_RST_C_PIN              (6)
+
+// multiplexed via HC138
+#define RFID_SS_A_PIN               (4)
+#define RFID_SS_B_PIN               (3)
+#define RFID_SS_C_PIN               (2)
+
 
 
 // set "CORE_DEBUG_LEVEL" build flag, and call "<hwserial>.setDebugOutput(true)"

@@ -45,8 +45,8 @@ MFRC522::MFRC522(	byte chipSelectPin,		///< Arduino pin connected to MFRC522's S
 } // End constructor
 #else
 
-MFRC522::MFRC522(SPIClass& spi, byte chipSelectPin, byte resetPowerDownPin)
-	: _spi(spi), _chipSelectPin(chipSelectPin), _resetPowerDownPin(resetPowerDownPin)
+MFRC522::MFRC522(SPIClass& spi, byte chipSelectPin, byte resetPowerDownPin, bool invertedChipSelect, bool invertedReset)
+	: _spi(spi), _chipSelectPin(chipSelectPin), _resetPowerDownPin(resetPowerDownPin), _invertedCS(invertedChipSelect), _invertedRst(invertedReset)
 {
 	//
 }
@@ -65,10 +65,10 @@ void MFRC522::PCD_WriteRegister(	PCD_Register reg,	///< The register to write to
 									byte value			///< The value to write.
 								) {
 	_spi.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);		// Select slave
+	_select();		// Select slave
 	_spi.transfer(reg);						// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
 	_spi.transfer(value);
-	digitalWrite(_chipSelectPin, HIGH);		// Release slave again
+	_unselect();		// Release slave again
 	_spi.endTransaction(); // Stop using the SPI bus
 } // End PCD_WriteRegister()
 
@@ -81,12 +81,12 @@ void MFRC522::PCD_WriteRegister(	PCD_Register reg,	///< The register to write to
 									byte *values		///< The values to write. Byte array.
 								) {
 	_spi.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);		// Select slave
+	_select();		// Select slave
 	_spi.transfer(reg);						// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
 	for (byte index = 0; index < count; index++) {
 		_spi.transfer(values[index]);
 	}
-	digitalWrite(_chipSelectPin, HIGH);		// Release slave again
+	_unselect();		// Release slave again
 	_spi.endTransaction(); // Stop using the SPI bus
 } // End PCD_WriteRegister()
 
@@ -98,10 +98,10 @@ byte MFRC522::PCD_ReadRegister(	PCD_Register reg	///< The register to read from.
 								) {
 	byte value;
 	_spi.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);			// Select slave
+	_select();			// Select slave
 	_spi.transfer(0x80 | reg);					// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
 	value = _spi.transfer(0);					// Read the value back. Send 0 to stop reading.
-	digitalWrite(_chipSelectPin, HIGH);			// Release slave again
+	_unselect();			// Release slave again
 	_spi.endTransaction(); // Stop using the SPI bus
 	return value;
 } // End PCD_ReadRegister()
@@ -122,7 +122,7 @@ void MFRC522::PCD_ReadRegister(	PCD_Register reg,	///< The register to read from
 	byte address = 0x80 | reg;				// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
 	byte index = 0;							// Index in values array.
 	_spi.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0));	// Set the settings to work with SPI bus
-	digitalWrite(_chipSelectPin, LOW);		// Select slave
+	_select();		// Select slave
 	count--;								// One read is performed outside of the loop
 	_spi.transfer(address);					// Tell MFRC522 which address we want to read
 	if (rxAlign) {		// Only update bit positions rxAlign..7 in values[0]
@@ -139,7 +139,7 @@ void MFRC522::PCD_ReadRegister(	PCD_Register reg,	///< The register to read from
 		index++;
 	}
 	values[index] = _spi.transfer(0);			// Read the final byte. Send 0 to stop reading.
-	digitalWrite(_chipSelectPin, HIGH);			// Release slave again
+	_unselect();			// Release slave again
 	_spi.endTransaction(); // Stop using the SPI bus
 } // End PCD_ReadRegister()
 
@@ -262,19 +262,19 @@ void MFRC522::PCD_Init() {
 	PCD_AntennaOn();						// Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
 } // End PCD_Init()
 
-void MFRC522::PCF_HardReset(bool inverted)
+void MFRC522::PCF_HardReset()
 {
     // Set the chipSelectPin as digital output, do not select the slave yet
     pinMode(_chipSelectPin, OUTPUT);
-    digitalWrite(_chipSelectPin, HIGH);
+    _unselect();
 
     // If a valid pin number has been set, pull device out of power down / reset state.
     if (UNUSED_PIN != _resetPowerDownPin)
 	{
         pinMode(_resetPowerDownPin, OUTPUT);
-        digitalWrite(_resetPowerDownPin, inverted ? HIGH : LOW);
+        digitalWrite(_resetPowerDownPin, _invertedRst ? HIGH : LOW);
         NOP(); yield(); //delay(1); // at least 100ns
-        digitalWrite(_resetPowerDownPin, inverted ? LOW : HIGH);
+        digitalWrite(_resetPowerDownPin, _invertedRst ? LOW : HIGH);
         delay(1); // at least 38us
     }
 }
@@ -518,7 +518,7 @@ MFRC522::StatusCode MFRC522::PCD_CommunicateWithPICC(	byte command,		///< The co
 	// When they are set in the ComIrqReg register, then the command is
 	// considered complete. If the command is not indicated as complete in
 	// ~36ms, then consider the command as timed out.
-#if 1
+#if 0
 	const uint32_t deadline = millis() + 36;
 #else
 	const uint32_t deadline = millis() + 3;

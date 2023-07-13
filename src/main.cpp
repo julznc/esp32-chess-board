@@ -1,5 +1,6 @@
 
 #include "globals.h"
+#include "board/board.h"
 #include "ui/ui.h"
 
 
@@ -9,6 +10,7 @@ void setup()
 
     WDT_WATCH(NULL);
 
+    brd::init();
     ui::init();
 }
 
