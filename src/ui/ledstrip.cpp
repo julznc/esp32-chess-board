@@ -12,6 +12,7 @@ Adafruit_NeoPixel pixels(LED_STRIP_NUMPIXELS, LED_STRIP_PIN, NEO_GRB + NEO_KHZ80
 bool init(void)
 {
     pixels.begin();
+    pixels.setBrightness(255);
 
     clear();
     update();

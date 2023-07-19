@@ -273,7 +273,7 @@ void MFRC522::PCF_HardReset()
 	{
         pinMode(_resetPowerDownPin, OUTPUT);
         digitalWrite(_resetPowerDownPin, _invertedRst ? HIGH : LOW);
-        NOP(); yield(); //delay(1); // at least 100ns
+        delay(1); // at least 100ns
         digitalWrite(_resetPowerDownPin, _invertedRst ? LOW : HIGH);
         delay(1); // at least 38us
     }

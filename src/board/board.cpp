@@ -2,6 +2,8 @@
 #include <MFRC522.h>
 
 #include "globals.h"
+
+#include "chess/chess.h"
 #include "ui/ui.h"
 
 #include "board.h"
@@ -85,25 +87,29 @@ static bool checkSquares(void)
 
 static inline uint8_t read_piece(void)
 {
-    MFRC522::StatusCode status;
-    uint8_t u8_piece = 0;
-
     byte buffer[16 + 2]; // minimum
     byte size = sizeof(buffer);
 
-    status = rc522.MIFARE_Read(0x04 /*NTAG_PIECE_ADDRESS*/, buffer, &size);
-    LOGD("read %c%u = %d", 'a' + u8_selected_file, u8_selected_rank + 1, status);
+    MFRC522::StatusCode status = rc522.MIFARE_Read(NTAG_DATA_START_PAGE, buffer, &size);
+    //LOGD("read %c%u = %d", 'a' + u8_selected_file, u8_selected_rank + 1, status);
     if (MFRC522::STATUS_OK != status)
     {
-        LOGW("read failed on %c%u", 'a' + u8_selected_file, u8_selected_rank + 1);
+        LOGW("read failed on %c%u (status=%d)", 'a' + u8_selected_file, u8_selected_rank + 1, status);
     }
     else
     {
-        dump_bytes(buffer, size);
-        // to do
+        uint8_t u8_piece = buffer[NTAG_DATA_PIECE_OFFSET];
+        uint8_t u7_type  = PIECE_TYPE(u8_piece);
+        uint8_t b_color  = PIECE_COLOR(u8_piece);
+        if (VALID_PIECE(u7_type))
+        {
+            LOGD("[%c on %c%u] %s %s", u8_piece, 'a' + u8_selected_file, u8_selected_rank + 1,
+                chess::color_to_string(b_color), chess::piece_to_string(u7_type));
+            return u8_piece;
+        }
     }
 
-    return u8_piece;
+    return 0;
 }
 
 static void scan(void)
@@ -120,7 +126,6 @@ static void scan(void)
             rc522.PCD_Init();
         }
 
-        delay(1);
         for (uint8_t file = 0; file < 8; file++)
         {
             select_file(file);
@@ -129,7 +134,8 @@ static void scan(void)
             ui::leds::setColor(rank, file, 0, 0, 0);
             if (rc522.PICC_IsNewCardPresent()) {
                 piece = read_piece();
-                ui::leds::setColor(rank, file, rand(), rand(), rand());
+                //ui::leds::setColor(rank, file, rand(), rand(), rand());
+                ui::leds::setColor(rank, file, 0, 255, 255);
             }
 
             (void)rc522.PICC_HaltA();
