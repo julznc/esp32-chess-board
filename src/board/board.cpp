@@ -47,14 +47,14 @@ static inline void select_rank(uint8_t rank)
 
 static bool checkSquares(void)
 {
-#if 0 // all 64 squares
+#if 1 // all 64 squares
     static const uint8_t RANK_START = 0;
     static const uint8_t RANK_END   = 7;
     static const uint8_t FILE_START = 0;
     static const uint8_t FILE_END   = 7;
 #else // testing only
     static const uint8_t RANK_START = 0;
-    static const uint8_t RANK_END   = 3;
+    static const uint8_t RANK_END   = 7;
     static const uint8_t FILE_START = 0;
     static const uint8_t FILE_END   = 3;
 #endif
@@ -64,6 +64,8 @@ static bool checkSquares(void)
     {
         select_rank(rank);
         rc522.PCF_HardReset();
+
+        ui::leds::clear();
 
         for (uint8_t file = FILE_START; b_complete && (file <= FILE_END); file++)
         {
@@ -75,14 +77,59 @@ static bool checkSquares(void)
             if ((u8_version == 0x00) || (u8_version == 0xFF))
             {
                 LOGW("sensor not found on square %c%u (%02X)", 'a' + file, rank + 1, u8_version);
+                ui::leds::clear();
+                ui::leds::setColor(rank, file, ui::leds::LED_RED);
                 b_complete = false;
-                break;
             }
-            LOGD("found %c%u v%02X", 'a' + file, rank + 1, u8_version);
+            else
+            {
+                //LOGD("found %c%u v%02X", 'a' + file, rank + 1, u8_version);
+                ui::leds::setColor(rank, file, ui::leds::LED_GREEN);
+            }
         }
+
+        ui::leds::update();
+        delay(50);
     }
 
     return b_complete;
+}
+
+static void lit_square(uint8_t u8_rank, uint8_t u8_file)
+{
+    ui::leds::clear();
+    ui::leds::setColor(u8_rank, u8_file, ui::leds::LED_ORANGE);
+    ui::leds::update();
+    delay(10);
+}
+
+static void animate_squares(void)
+{
+    int8_t rank, file;
+    int8_t file_start  = 0;
+    int8_t rank_start  = 0;
+    int8_t file_end    = 7;
+    int8_t rank_end    = 7;
+
+    while ((file_start <= file_end))
+    {
+        file = file_start;
+        while (file <= file_end)  { lit_square(rank_start, file++);  }
+
+        rank = rank_start;
+        while (rank <= rank_end)   { lit_square(rank++, file_end);   }
+
+        file = file_end;
+        while (file >= file_start) { lit_square(rank_end, file--);   }
+
+        rank = rank_end;
+        while (rank >= rank_start)  { lit_square(rank--, file_start); }
+
+        file_start++;
+        file_end--;
+        rank_start++;
+        rank_end--;
+    }
 }
 
 static inline uint8_t read_piece(void)
@@ -106,6 +153,10 @@ static inline uint8_t read_piece(void)
             LOGD("[%c on %c%u] %s %s", u8_piece, 'a' + u8_selected_file, u8_selected_rank + 1,
                 chess::color_to_string(b_color), chess::piece_to_string(u7_type));
             return u8_piece;
+        }
+        else
+        {
+            //LOGW("invalid piece %02x on %c%u", u8_piece, 'a' + u8_selected_file, u8_selected_rank + 1);
         }
     }
 
@@ -134,8 +185,7 @@ static void scan(void)
             ui::leds::setColor(rank, file, 0, 0, 0);
             if (rc522.PICC_IsNewCardPresent()) {
                 piece = read_piece();
-                //ui::leds::setColor(rank, file, rand(), rand(), rand());
-                ui::leds::setColor(rank, file, 0, 255, 255);
+                ui::leds::setColor(rank, file, ui::leds::LED_ORANGE);
             }
 
             (void)rc522.PICC_HaltA();
@@ -202,8 +252,9 @@ static void taskBoard(void *)
         switch (e_state)
         {
         case BRD_STATE_INIT:
-            if (checkSquares())
+            if (checkSquares() && checkSquares()) // check 2x
             {
+                animate_squares();
                 e_state = BRD_STATE_SCAN;
             }
             else
@@ -213,9 +264,16 @@ static void taskBoard(void *)
             break;
 
         case BRD_STATE_SCAN:
-            //LOGD("start scan");
-            scan();
-            //LOGD("end scan");
+            if (ui::btn::pb1.pressedDuration() > 5000UL)
+            {
+                e_state = BRD_STATE_INIT;
+            }
+            else
+            {
+                //LOGD("start scan");
+                scan();
+                //LOGD("end scan");
+            }
             break;
 
         default:

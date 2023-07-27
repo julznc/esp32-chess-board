@@ -15,7 +15,7 @@ static void cycle(void)
     switch (e_state)
     {
     case UI_STATE_INIT:
-        if (!display::init() || !leds::init())
+        if (!btn::init() || !display::init() || !leds::init())
         {
             delay(5*1000UL);
         }
@@ -33,7 +33,9 @@ static void cycle(void)
         break;
 
     case UI_STATE_IDLE:
+        btn::loop();
         //leds::test();
+        //leds::test2();
         break;
 
     default:
