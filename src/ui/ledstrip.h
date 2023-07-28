@@ -24,9 +24,9 @@ bool init(void);
 void update(void);
 void clear(void);
 
-void setColor(uint16_t u16_offset, uint32_t u32_color);
 void setColor(uint8_t u8_rank, uint8_t u8_file, uint8_t u8_red, uint8_t u8_green, uint8_t u8_blue);
 void setColor(uint8_t u8_rank, uint8_t u8_file, led_color_et e_color);
+void setColor(uint8_t /*square_et*/ e_square, led_color_et e_color);
 
 
 //#define LED_TESTS

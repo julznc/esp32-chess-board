@@ -38,11 +38,6 @@ void clear(void)
     pixels.fill(pixels.Color(0, 0, 0), 0, LED_STRIP_NUMPIXELS);
 }
 
-void setColor(uint16_t u16_offset, uint32_t u32_color)
-{
-    pixels.setPixelColor(u16_offset, u32_color);
-}
-
 void setColor(uint8_t u8_rank, uint8_t u8_file, uint8_t u8_red, uint8_t u8_green, uint8_t u8_blue)
 {
     uint16_t u16_mid     = (uint16_t)(u8_file >> 2) << 6;
@@ -97,6 +92,14 @@ void setColor(uint8_t u8_rank, uint8_t u8_file, led_color_et e_color)
             K_RGB[u8_idx][u8_offset+1],
             K_RGB[u8_idx][u8_offset+2]);
 #endif
+}
+
+void setColor(uint8_t /*square_et*/ e_square, led_color_et e_color)
+{
+    uint8_t u8_rank = 7 - (e_square >> 4);
+    uint8_t u8_file = (e_square & 0xF);
+
+    setColor(u8_rank, u8_file, e_color);
 }
 
 #ifdef LED_TESTS

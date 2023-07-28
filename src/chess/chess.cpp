@@ -11,16 +11,18 @@ namespace chess
 static game_st          st_game;
 SemaphoreHandle_t       mtx = NULL;
 static move_st          last_move;
+static move_st          pending_move;
 
 static const uint8_t   *pu8_pieces = NULL;
 static uint8_t          au8_prev_pieces[64];
 static char             fen_buf[80];
+static bool             pending_led = false;
 static bool             skip_start_fen = false;
 
 static struct {
     char san_black[16];
     char san_white[16];
-} s_move_stack[200];
+} s_move_stack[256];
 
 
 static uint8_t AU8_START_PIECES[64] =
@@ -128,12 +130,91 @@ void init(void)
     }
 
     memset(&last_move, 0, sizeof(move_st));
-    //memset(&pending_move, 0, sizeof(move_st));
+    memset(&pending_move, 0, sizeof(move_st));
 
     memset(&s_move_stack, 0, sizeof(s_move_stack));
     strncpy(s_move_stack[0].san_white, "...", 15);
     strncpy(s_move_stack[0].san_black, "...", 15);
 
+}
+
+static inline void show_turn(void)
+{
+    static bool state = false;
+    if (WHITE == st_game.stats.turn) {
+        ui::leds::setColor(d5, state ? ui::leds::LED_GREEN : ui::leds::LED_OFF);
+        ui::leds::setColor(e4, state ? ui::leds::LED_OFF : ui::leds::LED_GREEN);
+        ui::leds::setColor(d4, ui::leds::LED_OFF);
+        ui::leds::setColor(e5, ui::leds::LED_OFF);
+    } else {
+        ui::leds::setColor(d4, state ? ui::leds::LED_GREEN : ui::leds::LED_OFF);
+        ui::leds::setColor(e5, state ? ui::leds::LED_OFF : ui::leds::LED_GREEN);
+        ui::leds::setColor(d5, ui::leds::LED_OFF);
+        ui::leds::setColor(e4, ui::leds::LED_OFF);
+    }
+    state = !state; // blink
+}
+
+static inline void show_diff(const uint8_t *prev)
+{
+    for (uint8_t i = 0; i < 64; i++)
+    {
+        if (pu8_pieces[i] != prev[i]) {
+            ui::leds::setColor(i>>3, i&7, ui::leds::LED_RED);
+        }
+    }
+}
+
+static inline void show_checked(void)
+{
+    static bool state = false;
+    if (IN_CHECK(&st_game))
+    {
+        uint8_t idx = SQUARE_TO_IDX(st_game.stats.kings[st_game.stats.turn]);
+        ui::leds::setColor(idx>>3, idx&7, state ? ui::leds::LED_RED : ui::leds::LED_OFF);
+        state = !state; // blink
+    }
+}
+
+static inline void show_pending(void)
+{
+    pending_led = !pending_led; // blink
+
+    if (pending_move.piece)
+    {
+        ui::leds::setColor(pending_move.from, pending_led ? ui::leds::LED_OFF : ui::leds::LED_GREEN);
+        ui::leds::setColor(pending_move.to, pending_led ? ui::leds::LED_GREEN : ui::leds::LED_OFF);
+    }
+}
+
+static inline void show_move(void)
+{
+    if (last_move.piece)
+    {
+        ui::leds::setColor(last_move.from, ui::leds::LED_YELLOW);
+        if (pending_move.piece && (pending_move.to == last_move.from) && pending_led) {
+            ui::leds::setColor(last_move.from, ui::leds::LED_GREEN);
+        }
+
+        ui::leds::setColor(last_move.to, ui::leds::LED_YELLOW);
+        if (pending_move.piece && (pending_move.to == last_move.to) && pending_led) {
+            ui::leds::setColor(last_move.to, ui::leds::LED_GREEN);
+        }
+    }
+}
+
+static inline void display_stats(void)
+{
+    const stats_st *stats = &st_game.stats;
+
+    DISPLAY_TEXT1(0, 32, "%c %u %u",
+                WHITE == stats->turn ? 'w' : 'b',
+                stats->half_moves, stats->move_number);
+    DISPLAY_CLEAR_ROW(44, 20);
+    //DISPLAY_TEXT2(0, 44, "%s %s", san_white, san_black);
+    DISPLAY_TEXT2(0, 44, "%.15s %.15s",
+                s_move_stack[(WHITE == stats->turn) && (stats->move_number > 1) ? (stats->move_number - 2) : (stats->move_number - 1)].san_white,
+                s_move_stack[(stats->move_number > 1) ? (stats->move_number - 2) : (stats->move_number - 1)].san_black);
 }
 
 static inline void do_move(move_st *list, move_st *move)
@@ -181,7 +262,7 @@ static inline void do_move(move_st *list, move_st *move)
     }
     //DISPLAY_CLEAR();
     //DISPLAY_TEXT(4, 48, 1, "%s", san_buf);
-    //display_stats();
+    display_stats();
 }
 
 static inline bool check_start_fen(void)
@@ -230,6 +311,15 @@ void loop(void)
     else if (0 == memcmp(au8_prev_pieces, pu8_pieces, sizeof(au8_prev_pieces)))
     {
         //LOGD("no change yet");
+        if ((0 == last_move.piece) && (0 == pending_move.piece)) {
+            show_turn();
+            display_stats();
+        } else if (1) { //!hide_moves) {
+            show_pending();
+            show_move();
+            show_checked();
+        }
+        ui::leds::update();
     }
     else if (millis() - u32_last_checked < 500)
     {
@@ -253,13 +343,46 @@ void loop(void)
             LOGD("touch %s %s on %c%u", color_to_string(PIECE_COLOR(piece)), piece_to_string(PIECE_TYPE(piece)),
                 ALGEBRAIC(au8_allowed_squares[0]));
           #endif
-            ui::leds::setColor(7-RANK(au8_allowed_squares[0]), FILE(au8_allowed_squares[0]), ui::leds::LED_ORANGE);
+            ui::leds::setColor(au8_allowed_squares[0], ui::leds::LED_ORANGE);
             for (uint8_t i = 1; i < u8_squares_count; i++) {
-                ui::leds::setColor(7-RANK(au8_allowed_squares[i]), FILE(au8_allowed_squares[i]), ui::leds::LED_GREEN);
+                ui::leds::setColor(au8_allowed_squares[i], ui::leds::LED_GREEN);
                 //LOGD("%u/%u %c%u", i, u8_squares_count - 1, ALGEBRAIC(au8_allowed_squares[i]));
             }
             ui::leds::update();
         }
+        else
+        {
+            // is continuation ?
+            lock();
+            if (undo_move(&st_game, &move))
+            {
+                unlock();
+                clear_moves(&moves_list);
+                moves_list = generate_moves(&st_game);
+                if (find_move(&st_game, moves_list, pu8_pieces, &move))
+                {
+                    do_move(moves_list, &move);
+                }
+                else
+                {
+                    //LOGW("continuation not found");
+                    show_diff(au8_prev_pieces);
+                    ui::leds::update();
+                    lock();
+                    make_move(&st_game, &move); // redo last
+                    unlock();
+                }
+            }
+            else
+            {
+                //LOGW("move not found");
+                show_diff(au8_prev_pieces);
+                ui::leds::update();
+            }
+            unlock();
+        }
+
+        clear_moves(&moves_list);
 
         u32_last_checked = millis();
     }

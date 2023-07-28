@@ -182,7 +182,7 @@ static void scan(void)
             select_file(file);
 
             uint8_t piece = 0x00;
-            ui::leds::setColor(rank, file, 0, 0, 0);
+            ui::leds::setColor(rank, file, ui::leds::LED_OFF);
             if (rc522.PICC_IsNewCardPresent()) {
                 piece = read_piece();
                 ui::leds::setColor(rank, file, ui::leds::LED_ORANGE);
