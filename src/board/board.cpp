@@ -89,7 +89,7 @@ static bool checkSquares(void)
         }
 
         ui::leds::update();
-        delay(50);
+        delay(20);
     }
 
     return b_complete;
@@ -100,7 +100,7 @@ static void lit_square(uint8_t u8_rank, uint8_t u8_file)
     ui::leds::clear();
     ui::leds::setColor(u8_rank, u8_file, ui::leds::LED_ORANGE);
     ui::leds::update();
-    delay(10);
+    delay(5);
 }
 
 static void animate_squares(void)
@@ -246,6 +246,8 @@ static void taskBoard(void *)
             if (checkSquares() && checkSquares()) // check 2x
             {
                 animate_squares();
+                scan(); // initial scan
+                chess::init();
                 e_state = BRD_STATE_SCAN;
             }
             else
@@ -264,6 +266,7 @@ static void taskBoard(void *)
                 //uint32_t ms_start = millis();
                 scan();
                 //LOGD("scan duration %lu ms", millis() - ms_start);
+                chess::loop();
             }
             break;
 
@@ -306,6 +309,16 @@ void init(void)
         NULL,           /* Parameter passed as input of the task */
         3,              /* Priority of the task. */
         NULL);          /* Task handle. */
+}
+
+const uint8_t *pu8_pieces(void)
+{
+    return au8_pieces;
+}
+
+const uint32_t *pu32_toggle_ms(void)
+{
+    return au32_toggle_ms;
 }
 
 } // namespace brd
