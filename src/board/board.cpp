@@ -210,7 +210,7 @@ static void scan(void)
               #endif
                 if (piece != piece_check) // re-read
                 {
-                    LOGD("re-check %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
+                    //LOGD("re-check %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
                     rc522.PCD_Reset(); // soft reset
                     rc522.PCD_Init();
                     piece_check = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;

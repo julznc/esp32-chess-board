@@ -18,13 +18,15 @@ typedef enum {
 } piece_et;
 
 typedef enum {
-    BLACK = 0,
-    WHITE = 1
+    BLACK   = 0,
+    WHITE   = 1
 } color_et;
 
 /* 8-bit piece */
 #define PIECE_TYPE(u8_piece)            (tolower(u8_piece))
 #define PIECE_COLOR(u8_piece)           (isupper(u8_piece))
+#define PIECE_INT(u7_type)              (PAWN==(u7_type) ? 1 : (KNIGHT==(u7_type) ? 2 : (BISHOP==(u7_type) ? 3 : (ROOK==(u7_type) ? 4 : (QUEEN==(u7_type) ? 5 : (KING==(u7_type) ? 6 : 0))))))
+#define SWAP_COLOR(color)               ((color) == WHITE ? BLACK : WHITE)
 #define MAKE_PIECE(b_color, u7_type)    ((uint8_t)(b_color ? toupper(u7_type) : tolower(u7_type)))
 #define VALID_PIECE(u7_type)            ((chess::PAWN==u7_type) || (chess::KNIGHT==u7_type) || (chess::BISHOP==u7_type) || \
                                          (chess::ROOK==u7_type) || (chess::QUEEN==u7_type)  || (chess::KING==u7_type))
@@ -43,14 +45,80 @@ typedef enum {
 
 #define SQUARE_TO_IDX(sq)               (((7 - ((sq)>>4)) << 3) + ((sq) & 0xF))
 #define IDX_TO_SQUARE(idx)              (((7 - ((idx)>>3)) << 4) + ((idx) & 0x7))
+
 #define RANK(sq)                        ((sq) >> 4) // row
 #define FILE(sq)                        ((sq) & 0xF) // column
 #define ALGEBRAIC(sq)                   FILE(sq) + 'a', 8 - RANK(sq)
 
 
+typedef enum {
+    BIT_NORMAL       = (1<<0),
+    BIT_CAPTURE      = (1<<1),
+    BIT_BIG_PAWN     = (1<<2),
+    BIT_EP_CAPTURE   = (1<<3),
+    BIT_PROMOTION    = (1<<4),
+    BIT_KSIDE_CASTLE = (1<<5),
+    BIT_QSIDE_CASTLE = (1<<6)
+} movemask_et;
+
+typedef enum {
+    RANK_1  = 7,
+    RANK_2  = 6,
+    RANK_3  = 5,
+    RANK_4  = 4,
+    RANK_5  = 3,
+    RANK_6  = 2,
+    RANK_7  = 1,
+    RANK_8  = 0
+} rank_et;
+
+typedef struct move {
+    struct move *next;
+    uint8_t from;
+    uint8_t to;
+    uint8_t piece;
+    uint8_t flags;
+    uint8_t captured;
+} move_st;
+
+typedef struct {
+    uint8_t  turn;          // which color to move
+    uint8_t  ep_square;     // en-pasant square
+    uint8_t  castling[2];   // castling rights
+    uint16_t half_moves;
+    uint16_t move_number;
+    uint8_t  kings[2];      // kings position
+} stats_st;
+
+typedef struct record {
+    struct record *next;
+    move_st  move;
+    stats_st stats;
+} record_st;
+
+typedef struct {
+    uint8_t    board[128];  // position
+    stats_st   stats;
+    record_st *history;
+} game_st;
+
 
 void init(void);
 void loop(void);
+
+const char *generate_fen(const game_st *p_game);
+
+bool attacked(const uint8_t *board, uint8_t color, uint8_t square);
+#define KING_ATTACKED(game, color)  attacked((game)->board, SWAP_COLOR((color)),  (game)->stats.kings[(color)])
+#define IN_CHECK(game)              KING_ATTACKED((game), (game)->stats.turn)
+
+void make_move(game_st *p_game, const move_st *move);
+bool undo_move(game_st *p_game, move_st *last=nullptr);
+move_st *generate_moves(game_st *p_game);
+bool move_to_san(move_st *list /*moves list*/, const move_st *p_move /*convert to SAN*/, char *san_buf, uint8_t buf_sz);
+bool find_move(game_st *p_game /*board*/, move_st *list /*moves list*/, const uint8_t *scan /*input or desired raw position*/, move_st *p_move /*found move*/);
+uint8_t hint_moves(game_st *p_game /*board*/, move_st *list /*moves list*/, const uint8_t *scan, uint8_t *squares_buf, uint8_t max_count);
+void clear_moves(move_st **plist);
 
 const char *color_to_string(uint8_t b_color);
 const char *piece_to_string(uint8_t u7_type);
