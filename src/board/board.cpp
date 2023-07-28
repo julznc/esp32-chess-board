@@ -150,8 +150,8 @@ static inline uint8_t read_piece(void)
         uint8_t b_color  = PIECE_COLOR(u8_piece);
         if (VALID_PIECE(u7_type))
         {
-            LOGD("[%c on %c%u] %s %s", u8_piece, 'a' + u8_selected_file, u8_selected_rank + 1,
-                chess::color_to_string(b_color), chess::piece_to_string(u7_type));
+            //LOGD("[%c on %c%u] %s %s", u8_piece, 'a' + u8_selected_file, u8_selected_rank + 1,
+            //    chess::color_to_string(b_color), chess::piece_to_string(u7_type));
             return u8_piece;
         }
         else
@@ -169,7 +169,7 @@ static void scan(void)
     {
         select_rank(rank);
         rc522.PCF_HardReset();
-#if 1
+#if 0
         delay(2);
         for (uint8_t file = 0; file < 8; file++)
         {
@@ -190,38 +190,31 @@ static void scan(void)
 
             (void)rc522.PICC_HaltA();
         }
-
-#else
+#elif 1
         for (uint8_t file = 0; file < 8; file++)
         {
             select_file(file);
             rc522.PCD_Init();
-            delay(1);
 
-            uint8_t idx = (rank<<3) + file;
-            uint8_t piece = 0x00;
-            //uint8_t piece = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;
-            ui::leds::setColor(rank, file, 0, 0, 0);
-            if (rc522.PICC_IsNewCardPresent()) {
-                piece = read_piece();
-                ui::leds::setColor(rank, file, rand(), rand(), rand());
-            }
+            uint8_t idx   = (rank<<3) + file;
+            uint8_t piece = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;
 
-            //lock();
             if (au8_pieces[idx] != piece)
             {
-                //LOGD("verify %02x vs %02x on %c%u", piece, au8_pieces[idx], 'a' + file, rank + 1);
+              #if 0
                 rc522.PCD_Reset(); // soft reset
                 rc522.PCD_Init();
                 uint8_t piece_check = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;
+              #else
+                uint8_t piece_check = read_piece();
+              #endif
                 if (piece != piece_check) // re-read
                 {
-                    //LOGD("re-check %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
+                    LOGD("re-check %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
                     rc522.PCD_Reset(); // soft reset
                     rc522.PCD_Init();
                     piece_check = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;
                 }
-                //if (piece != piece_check) // verify x2
                 if ((piece != piece_check) && (au8_pieces[idx] != piece_check)) // verify x2
                 {
                     LOGW("verify failed %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
@@ -232,12 +225,10 @@ static void scan(void)
                     au32_toggle_ms[idx] = millis();
                 }
             }
+
             au8_pieces[idx] = piece;
-            //unlock();
-            if (MFRC522::STATUS_OK != rc522.PICC_HaltA())
-            {
-                //LOGW("halt error?");
-            }
+
+            (void)rc522.PICC_HaltA();
         }
 #endif
     }
@@ -270,9 +261,9 @@ static void taskBoard(void *)
             }
             else
             {
-                //LOGD("start scan");
+                //uint32_t ms_start = millis();
                 scan();
-                //LOGD("end scan");
+                //LOGD("scan duration %lu ms", millis() - ms_start);
             }
             break;
 
