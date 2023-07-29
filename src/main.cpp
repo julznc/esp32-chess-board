@@ -2,6 +2,7 @@
 #include "globals.h"
 #include "board/board.h"
 #include "ui/ui.h"
+#include "wifi/wifi_setup.h"
 
 
 void setup()
@@ -12,6 +13,7 @@ void setup()
 
     brd::init();
     ui::init();
+    wifi::setup();
 }
 
 void loop()
