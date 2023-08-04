@@ -23,7 +23,7 @@ static void cycle(void)
         {
             delay(3*1000UL);
             DISPLAY_CLEAR();
-            DISPLAY_TEXT2(0, 10, "e-Board %02x.%02x", K_FW_VER_MAJOR, K_FW_VER_MINOR);
+            DISPLAY_TEXT2(0, 10, "e-Board %s", K_APP_VERSION);
             //DISPLAY_TEXT2(20, 6, "electronic");
             //DISPLAY_TEXT2(10, 24, "chess board");
             //DISPLAY_TEXT2(30, 42, "v01.00");

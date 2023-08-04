@@ -34,7 +34,7 @@ void global_init(void)
 
     PRINTF("\r\n");
     LOGI("--- %s ---", K_APP_NAME);
-    LOGI("--- ver: %02x.%02x.%02x ---", K_FW_VER_MAJOR, K_FW_VER_MINOR, K_FW_VER_TEST);
+    LOGI("--- ver: %s ---", K_APP_VERSION);
 
     uint8_t au8_base_mac[8];
     if (ESP_OK == esp_efuse_mac_get_default(au8_base_mac))
