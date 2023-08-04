@@ -49,6 +49,11 @@ extern const GFXfont           *font2;
 
 bool init(void);
 
+//#define BATT_ADC_SCALE          ((3.3 x 5.6) / ((3.3 + 5.6) * 4095))  // raw to V
+#define BATT_ADC_SCALE          (0.0005070585f)
+
+void showBattLevel(void);
+
 } // namespace ui::display
 
 #endif // __UI_DISPLAY_H__

@@ -44,4 +44,18 @@ bool init(void)
     return true;
 }
 
+void showBattLevel(void)
+{
+    static uint16_t  prev_raw = 0;
+    uint16_t         raw      = analogRead(BATT_ADC_PIN);
+
+    if (prev_raw != raw)
+    {
+        float f_batt = ((float)(raw + prev_raw) / 2) * BATT_ADC_SCALE;
+        //DISPLAY_TEXT1(0, 20, "Batt %.2fV", f_batt);
+        DISPLAY_TEXT1(95, 0, "%.2fV", f_batt);
+        prev_raw = raw;
+    }
+}
+
 } // namespace ui::display

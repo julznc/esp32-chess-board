@@ -8,7 +8,7 @@
 
 // app firmware info
 #define K_APP_NAME                  "Electronic Chess Board"
-#define K_APP_VERSION               "01.03.05"
+#define K_APP_VERSION               "01.03.06"
 
 
 // for esp32-s2: RX1=18, TX1=17
@@ -22,12 +22,13 @@
 #define I2C_SCL_PIN                 (10)
 #define LED_STRIP_PIN               (21)
 
+#define BATT_ADC_PIN                (16)    // battery voltage monitor (3k3 & 5k6 divider)
 #define BTN_1_PIN                   (11)    // SW3 (upper left)
 #define BTN_2_PIN                   (12)    // SW2 (lower left)
 #define BTN_3_PIN                   (14)    // SW4 (lower right)
 
 // spi bus
-#define RFID_SPI_BUS                HSPI // SPI2
+#define RFID_SPI_BUS                HSPI    // SPI2
 #define RFID_MISO_PIN               (33)
 #define RFID_MOSI_PIN               (34)
 #define RFID_SCK_PIN                (35)
