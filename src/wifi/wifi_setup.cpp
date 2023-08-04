@@ -11,13 +11,8 @@
 #include "wifi_setup.h"
 
 
-#if 0
-#define SHOW_STATUS(msg, ...)       DISPLAY_CLEAR_ROW(120, 8); \
-                                    DISPLAY_TEXT1(5, 120, msg, ## __VA_ARGS__)
-#else
-#define SHOW_STATUS(...)
-#endif
-
+#define SHOW_STATUS(msg, ...)       DISPLAY_CLEAR_ROW(10, 8); \
+                                    DISPLAY_TEXT1(0, 10, msg, ## __VA_ARGS__)
 
 #define MAX_FOUND_STATIONS          (16)
 #define MAX_CONNECT_RETRIES         (8)
@@ -98,7 +93,7 @@ static void init()
 static inline bool scan()
 {
     LOGD("Scanning local WiFi networks ...");
-    SHOW_STATUS("scanning Wi-Fi ...");
+    SHOW_STATUS("scanning Wi-Fi...");
     int stationsFound = WiFi.scanNetworks();
     LOGD("%i networks found", stationsFound);
 
@@ -162,7 +157,7 @@ static inline void connect()
 
         LOGD("connecting to AP #%d %s %s-%s (%u/%u)...", u8_idx + 1, mac.c_str(), ssid_str,
             passphrase, s_found_stations.u8_retry + 1, MAX_CONNECT_RETRIES);
-        SHOW_STATUS("%s (%u) connecting...", ssid.c_str(), u8_idx + 1);
+        SHOW_STATUS("%s ...", ssid.c_str());
 
 #if 0 // test to fail
         if (bssid && (0x43 == bssid[5])) {
@@ -191,7 +186,7 @@ static inline void connect()
             ip = WiFi.localIP();
             LOGI("connected to %s %s %d.%d.%d.%d", WiFi.BSSIDstr().c_str(),
                 WiFi.SSID().c_str(), ip[0], ip[1], ip[2], ip[3]);
-            SHOW_STATUS("%s - %d.%d", ssid, ip[2], ip[3]); // hide "192.168" octet
+            SHOW_STATUS("%s %d.%d", ssid, ip[2], ip[3]); // hide "192.168" octet
 
             // set NTP
             configTime(PH_GMT_OFFSET_SEC, PH_DAYLIGHT_OFFSET_SEC, NTP_SERVERS[0], NTP_SERVERS[1], NTP_SERVERS[2]);
@@ -227,8 +222,7 @@ static inline void soft_ap()
     {
         ip = WiFi.softAPIP();
         LOGI("IP address: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-        //SHOW_STATUS("soft-AP %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-        SHOW_STATUS("%.8s - %d.%d", hostname.c_str() + 19, ip[2], ip[3]);
+        SHOW_STATUS("%.8s %d.%d", hostname.c_str() + 19, ip[2], ip[3]);
 
         ms_soft_ap  = millis();
         e_state     = WIFI_STATE_LOOP;
@@ -282,7 +276,7 @@ static inline void loop()
         {
             if (!warned) {
                 LOGW("WiFi disconnected, retrying");
-                SHOW_STATUS(" disconnected");
+                SHOW_STATUS("disconnected");
                 warned = true;
             }
             b_ntp_connected = false;

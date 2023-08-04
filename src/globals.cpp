@@ -1,4 +1,7 @@
 
+#include <soc/soc.h>
+#include <soc/rtc_cntl_reg.h>
+
 #include <Wire.h>
 #include "globals.h"
 
@@ -7,6 +10,9 @@ void global_init(void)
 {
     HWSERIAL.begin(115200);
     HWSERIAL.setDebugOutput(true);
+
+    // disable brownout detector
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
     // watchdog
     esp_task_wdt_init(WDT_TIMEOUT_SEC, true); // enable panic so ESP32 restarts
