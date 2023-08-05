@@ -292,6 +292,7 @@ static void taskWiFi(void *)
     web::serverSetup();
 
     WDT_WATCH(NULL);
+    delay(3000UL);
 
     for (;;)
     {

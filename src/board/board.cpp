@@ -290,8 +290,12 @@ static void scan(void)
 
 static void taskBoard(void *)
 {
+    WDT_WATCH(NULL);
+
     for(;;)
     {
+        WDT_FEED();
+
         switch (e_state)
         {
         case BRD_STATE_INIT:

@@ -54,10 +54,14 @@ static void cycle(void)
 
 static void taskUI(void *)
 {
+    WDT_WATCH(NULL);
+
     for(;;)
     {
+        WDT_FEED();
+
         cycle();
-        delay(10);
+        delay(5);
     }
 }
 
