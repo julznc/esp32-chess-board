@@ -7,10 +7,8 @@
 #include "web_server_cfg.h"
 #include "web_server.h"
 
-#if 0
 #include "index.html.h"
 #include "favicon.svg.h"
-#endif
 
 
 namespace web
@@ -20,8 +18,7 @@ WebServer server(WEB_SERVER_HTTP_PORT);
 
 static void handleRoot()
 {
-    //server.send(200, "text/html", index_html);
-    server.send(200, "text/html", "<html>esp32-chess</html>");
+    server.send(200, "text/html", index_html);
 }
 
 static void handleNotFound()
@@ -34,11 +31,9 @@ void serverSetup(void)
 {
     server.on("/", handleRoot);
 
-#if 0 // to do
     server.on("/favicon.ico", HTTP_GET, []() {
         server.send(200, "image/svg+xml", favicon_svg);
     });
-#endif
 
     server.on("/version", HTTP_GET, []() {
         server.send(200, "text/plain", K_APP_VERSION);
