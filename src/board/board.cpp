@@ -132,16 +132,96 @@ static void animate_squares(void)
     }
 }
 
-static inline uint8_t read_piece(void)
+static inline void square_init(void)
 {
-    byte buffer[16 + 2]; // minimum
-    byte size = sizeof(buffer);
+#if 0
+    rc522.PCD_Init();
+#else
+    uint8_t u8_cmdreg = 0;
+    uint8_t u8_count  = 0;
 
-    MFRC522::StatusCode status = rc522.MIFARE_Read(NTAG_DATA_START_PAGE, buffer, &size);
-    //LOGD("read %c%u = %d", 'a' + u8_selected_file, u8_selected_rank + 1, status);
-    if (MFRC522::STATUS_OK != status)
+    // wait for 100ms to be ready
+    while (((u8_cmdreg = rc522.PCD_ReadRegister(MFRC522::CommandReg)) & 0x10) && (++u8_count < 100)){
+        delay(1);
+    }
+
+    if (u8_cmdreg & 10) {
+        //LOGW("%c%u not ready (%02x)", 'a' + u8_selected_file, u8_selected_rank + 1, u8_cmdreg);
+    }
+
+    rc522.PCD_WriteRegister(MFRC522::TModeReg, 0x80);
+    rc522.PCD_WriteRegister(MFRC522::TPrescalerReg, 0xA9);
+    rc522.PCD_WriteRegister(MFRC522::TReloadRegH, 0x03);
+    rc522.PCD_WriteRegister(MFRC522::TReloadRegL, 0xE8);
+
+    rc522.PCD_WriteRegister(MFRC522::TxASKReg, 0x40);
+    rc522.PCD_WriteRegister(MFRC522::ModeReg, 0x3D);
+    rc522.PCD_AntennaOn();
+#endif
+}
+
+static inline void square_deinit(void)
+{
+#if 0
+    rc522.PICC_HaltA();
+#else // power-down & receiver-off
+    rc522.PCD_WriteRegister(MFRC522::CommandReg, 0x30);
+#endif
+}
+
+static inline bool has_piece(void)
+{
+    MFRC522::StatusCode result;
+    byte                bufferATQA[2];
+    byte                bufferSize = sizeof(bufferATQA);
+
+    // Reset baud rates
+    rc522.PCD_WriteRegister(MFRC522::TxModeReg, 0x00);
+    rc522.PCD_WriteRegister(MFRC522::RxModeReg, 0x00);
+    // Reset ModWidthReg
+    rc522.PCD_WriteRegister(MFRC522::ModWidthReg, 0x26);
+
+    result = rc522.PICC_RequestA(bufferATQA, &bufferSize);
+    return ((MFRC522::STATUS_OK == result) || (MFRC522::STATUS_COLLISION == result));
+}
+
+static inline uint8_t read_piece(uint16_t u8_expected_piece, uint8_t u8_retry, bool b_init)
+{
+    MFRC522::StatusCode status;
+    byte                buffer[16 + 2]; // minimum
+    byte                size = sizeof(buffer);
+
+    if (b_init)
     {
-        LOGW("read failed on %c%u (status=%d)", 'a' + u8_selected_file, u8_selected_rank + 1, status);
+        //rc522.PCD_Reset(); // soft reset
+        square_init();
+    }
+
+    if (!has_piece())
+    {
+        if (0 != u8_expected_piece)
+        {
+            if (u8_retry > 0)
+            {
+                return read_piece(u8_expected_piece, --u8_retry, false);
+            }
+            else
+            {
+                //LOGW("removed %c on %c%u?", u8_expected_piece, 'a' + u8_selected_file, u8_selected_rank + 1);
+            }
+        }
+    }
+    else if (MFRC522::STATUS_OK != (status = rc522.MIFARE_Read(NTAG_DATA_START_PAGE, buffer, &size)))
+    {
+        if (u8_retry > 0)
+        //if ((u8_retry > 0) && ((MFRC522::STATUS_TIMEOUT==status) || (MFRC522::STATUS_CRC_WRONG==status)))
+        {
+            return read_piece(u8_expected_piece, --u8_retry, false);
+        }
+        else
+        {
+            LOGW("read failed on %c%u (status=%d)", 'a' + u8_selected_file, u8_selected_rank + 1, status);
+        }
     }
     else
     {
@@ -165,55 +245,28 @@ static inline uint8_t read_piece(void)
 
 static void scan(void)
 {
+    static const uint8_t MAX_READ_RETRIES = 16;
+
     for (uint8_t rank = 0; rank < 8; rank++)
     {
         select_rank(rank);
         rc522.PCF_HardReset();
-#if 0
-        delay(2);
-        for (uint8_t file = 0; file < 8; file++)
-        {
-            select_file(file);
-            rc522.PCD_Init();
-        }
 
         for (uint8_t file = 0; file < 8; file++)
         {
             select_file(file);
-
-            uint8_t piece = 0x00;
-            ui::leds::setColor(rank, file, ui::leds::LED_OFF);
-            if (rc522.PICC_IsNewCardPresent()) {
-                piece = read_piece();
-                ui::leds::setColor(rank, file, ui::leds::LED_ORANGE);
-            }
-
-            (void)rc522.PICC_HaltA();
-        }
-#elif 1
-        for (uint8_t file = 0; file < 8; file++)
-        {
-            select_file(file);
-            rc522.PCD_Init();
 
             uint8_t idx   = (rank<<3) + file;
-            uint8_t piece = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;
+            uint8_t piece = read_piece(au8_pieces[idx], MAX_READ_RETRIES, true);
 
             if (au8_pieces[idx] != piece)
             {
-              #if 0
-                rc522.PCD_Reset(); // soft reset
-                rc522.PCD_Init();
-                uint8_t piece_check = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;
-              #else
-                uint8_t piece_check = read_piece();
-              #endif
+                uint8_t piece_check = read_piece(au8_pieces[idx], MAX_READ_RETRIES, true);
+
                 if (piece != piece_check) // re-read
                 {
                     //LOGD("re-check %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
-                    rc522.PCD_Reset(); // soft reset
-                    rc522.PCD_Init();
-                    piece_check = rc522.PICC_IsNewCardPresent() ? read_piece() : 0x00;
+                    piece_check = read_piece(piece, MAX_READ_RETRIES, true);
                 }
                 if ((piece != piece_check) && (au8_pieces[idx] != piece_check)) // verify x2
                 {
@@ -228,12 +281,11 @@ static void scan(void)
 
             au8_pieces[idx] = piece;
 
-            (void)rc522.PICC_HaltA();
+            square_deinit();
         }
-#endif
+
     }
     //LOGD("scan done");
-    ui::leds::update();
 }
 
 static void taskBoard(void *)

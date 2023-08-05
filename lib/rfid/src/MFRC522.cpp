@@ -521,7 +521,7 @@ MFRC522::StatusCode MFRC522::PCD_CommunicateWithPICC(	byte command,		///< The co
 #if 0
 	const uint32_t deadline = millis() + 36;
 #else
-	const uint32_t deadline = millis() + 3;
+	const uint32_t deadline = millis() + 5;
 #endif
 	bool completed = false;
 
@@ -534,12 +534,13 @@ MFRC522::StatusCode MFRC522::PCD_CommunicateWithPICC(	byte command,		///< The co
 		if (n & 0x01) {						// Timer interrupt - nothing received in 5ms
 			return STATUS_TIMEOUT;
 		}
-		yield();
+		delay(1);
 	}
 	while (static_cast<uint32_t> (millis()) < deadline);
 
 	// 36ms and nothing happened. Communication with the MFRC522 might be down.
 	if (!completed) {
+		//log_w("Timeout");
 		return STATUS_TIMEOUT;
 	}
 
