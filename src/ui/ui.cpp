@@ -24,7 +24,7 @@ static void cycle(void)
         {
             delay(1*1000UL);
             DISPLAY_TEXT1(0, 0, "e-Board v%s", K_APP_VERSION);
-            delay(2*1000UL);
+            delay(1*1000UL);
             DISPLAY_CLEAR();
             DISPLAY_TEXT1(0, 0, "e-Board v%.5s", K_APP_VERSION);
             //DISPLAY_TEXT2(20, 6, "electronic");

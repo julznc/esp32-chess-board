@@ -33,14 +33,18 @@ static enum {
 
 static bool get_account()
 {
+    bool b_status = false;
+
     if (!https.begin(client, "https://lichess.org/api/account"))
     {
         LOGW("failed https.begin()");
+        SHOW_STATUS("lichess url error");
     }
     else
     {
         https.addHeader("Authorization", auth);
         LOGD("[HTTPS] GET...");
+        SHOW_STATUS("lichess.org ...");
         int httpCode = https.GET();
         LOGD("GET() = %d", httpCode);
         if (httpCode > 0)
@@ -48,28 +52,37 @@ static bool get_account()
             if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))
             {
                 String payload = https.getString();
-                LOGD("payload:\r\n%s", payload.c_str());
+                //LOGD("payload:\r\n%s", payload.c_str());
                 response.clear();
                 DeserializationError error = deserializeJson(response, payload);
                 if (error)
                 {
                     LOGW("deserializeJson() failed", error.f_str());
+                    SHOW_STATUS("parse response failed");
+                }
+                else if (!response.containsKey("username"))
+                {
+                    LOGW("unknown username");
+                    SHOW_STATUS("unknown username");
                 }
                 else
                 {
                     const char *username = response["username"].as<const char*>();
                     LOGI("username : %s", username);
                     SHOW_STATUS("user: %s", username);
+                    b_status = true;
                 }
             }
             else
             {
                 LOGW("GET failed: %s", https.errorToString(httpCode).c_str());
+                SHOW_STATUS("lichess response error");
             }
         }
         https.end();
     }
-    return false;
+
+    return b_status;
 }
 
 static void taskClient(void *)
@@ -77,6 +90,7 @@ static void taskClient(void *)
     WDT_WATCH(NULL);
 
     client.setCACert(LICHESS_ORG_PEM);
+    delay(2500UL);
 
     for (;;)
     {
@@ -92,14 +106,17 @@ static void taskClient(void *)
 
                 e_state = CLIENT_STATE_ACCOUNT;
             }
+            else
+            {
+                SHOW_STATUS("lichess offline");
+                delay(1500UL);
+            }
             break;
 
         case CLIENT_STATE_ACCOUNT:
-            if (ui::btn::pb2.getCount())
+            if (get_account())
             {
-                get_account();
-
-                delay(2000UL);
+                e_state = CLIENT_STATE_IDLE;
             }
             break;
 
