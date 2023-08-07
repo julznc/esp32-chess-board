@@ -147,6 +147,16 @@ static int poll_events()
                 if (0 == strncmp(type, "challenge", strlen("challenge")))
                 {
                     result = parse_challenge_event(response, &s_challenge);
+                    if (CHALLENGE_CREATED == result)
+                    {
+                        LOGI("incoming %s challenge '%s' from '%s' (%s %u+%u)", s_challenge.b_rated ? "rated" : "casual",
+                            s_challenge.ac_id, s_challenge.ac_user, s_challenge.b_color ? "white" : "black",
+                            s_challenge.u16_clock_limit/60, s_challenge.u8_clock_increment);
+                    }
+                    else //if (result)
+                    {
+                        LOGD("challenge -> %d", result);
+                    }
                 }
             }
         }
