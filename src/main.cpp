@@ -10,9 +10,9 @@ void setup()
 {
     global_init();
 
+    ui::init();
     brd::init();
     lichess::init();
-    ui::init();
     wifi::setup();
 }
 

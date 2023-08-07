@@ -1,7 +1,8 @@
 #ifndef __LICHESS_API_CFG_H__
 #define __LICHESS_API_CFG_H__
 
-static const char *LICHESS_SERVER = "lichess.org";
+
+#define LICHESS_API_URL_PREFIX      "https://lichess.org/api"
 
 static const char *LICHESS_API_ACCESS_TOKEN = "lip_WFDx9jsINha7GznSYwbm";
 
