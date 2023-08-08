@@ -49,6 +49,7 @@ void init(void);
  * Private Function Prototypes
  */
 bool api_get(const char *endpoint, DynamicJsonDocument &response, bool b_debug=false);
+bool api_post(const char *endpoint, String payload, DynamicJsonDocument &response, bool b_debug=false);
 
 } // namespace lichess
 

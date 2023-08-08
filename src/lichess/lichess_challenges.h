@@ -46,12 +46,15 @@ typedef struct
     uint16_t        u16_clock_limit;    // seconds
     uint8_t         u8_clock_increment; // seconds
     bool            b_rated;
-    bool            b_color;            // true = white
+    bool            b_color;            // challenger's color (true = white)
 } challenge_st;
 
 
 // return challenge_type_st or negative for error
-int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge);
+int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge /*output*/);
+bool accept_challenge(const char *challengeId);
+bool decline_challenge(const char *challengeId, const char *reason=NULL);
+bool cancel_challenge(const char *challengeId);
 
 } // namespace lichess
 

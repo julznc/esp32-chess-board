@@ -14,6 +14,19 @@
 namespace lichess
 {
 
+static ApiClient        client;                 // main connection (non-stream)
+static ApiClient        events_client;          // events-stream connection
+DynamicJsonDocument     response(2*1024);
+static challenge_st     s_incoming_challenge;
+
+static enum {
+    CLIENT_STATE_INIT,
+    CLIENT_STATE_GET_ACCOUNT,   // check lichess account/profile
+    CLIENT_STATE_POLL_EVENTS,   // stream incoming events
+    CLIENT_STATE_IDLE
+} e_state;
+
+
 ApiClient::ApiClient() : HTTPClient(),
     _auth("Bearer "), _url(LICHESS_API_URL_PREFIX)
 {
@@ -80,18 +93,6 @@ String ApiClient::streamResponse()
 }
 
 
-ApiClient           client;
-DynamicJsonDocument response(2*1024);
-
-
-static enum {
-    CLIENT_STATE_INIT,
-    CLIENT_STATE_GET_ACCOUNT,   // check lichess account/profile
-    CLIENT_STATE_POLL_EVENTS,   // stream incoming events
-    CLIENT_STATE_IDLE
-} e_state;
-
-
 static bool get_account()
 {
     bool b_status = false;
@@ -119,13 +120,12 @@ static bool get_account()
 
 static int poll_events()
 {
-    String          payload;
-    challenge_st    s_challenge;
-    int             result = -1;
+    String  payload;
+    int     result = -1;
 
-    if (client.connected())
+    if (events_client.connected())
     {
-        payload = client.streamResponse();
+        payload = events_client.streamResponse();
         result  = 0;
         if (payload.length() > 1)
         {
@@ -146,16 +146,24 @@ static int poll_events()
                 LOGD("event %s", type);
                 if (0 == strncmp(type, "challenge", strlen("challenge")))
                 {
-                    result = parse_challenge_event(response, &s_challenge);
-                    if (CHALLENGE_CREATED == result)
+                    challenge_st *pc = &s_incoming_challenge;
+                    DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
+                    result = parse_challenge_event(response, pc);
+                    if ((CHALLENGE_CREATED == result) && pc->ac_id[0] && pc->ac_user[0])
                     {
-                        LOGI("incoming %s challenge '%s' from '%s' (%s %u+%u)", s_challenge.b_rated ? "rated" : "casual",
-                            s_challenge.ac_id, s_challenge.ac_user, s_challenge.b_color ? "white" : "black",
-                            s_challenge.u16_clock_limit/60, s_challenge.u8_clock_increment);
+                        LOGI("incoming %s challenge '%s' from '%s' (%s %u+%u)", pc->b_rated ? "rated" : "casual",
+                            pc->ac_id, pc->ac_user, pc->b_color ? "white" : "black",
+                            pc->u16_clock_limit/60, pc->u8_clock_increment);
+                        DISPLAY_TEXT1(0, 45, "vs %.*s (%c %u+%u)", 7, pc->ac_user, pc->b_color ? 'B' : 'W',
+                                      pc->u16_clock_limit/60, pc->u8_clock_increment);
+                        DISPLAY_TEXT1(0, 54, "<-Accept    Decline->", pc->ac_id, pc->ac_user);
+                        result = EVENT_CHALLENGE_INCOMING;
                     }
                     else //if (result)
                     {
                         LOGD("challenge -> %d", result);
+                        memset(&s_incoming_challenge, 0, sizeof(s_incoming_challenge));
+                        result = EVENT_CHALLENGE_CANCELED;
                     }
                 }
             }
@@ -193,7 +201,7 @@ static void taskClient(void *)
         case CLIENT_STATE_GET_ACCOUNT:
             if (get_account())
             {
-                if (client.startStream("/stream/event"))
+                if (events_client.startStream("/stream/event"))
                 {
                     e_state = CLIENT_STATE_POLL_EVENTS;
                 }
@@ -216,6 +224,14 @@ static void taskClient(void *)
             break;
 
         case CLIENT_STATE_IDLE:
+            if (s_incoming_challenge.ac_id[0])
+            {
+                if (ui::btn::pb3.getCount()) {
+                    decline_challenge(s_incoming_challenge.ac_id);
+                } else if (ui::btn::pb2.getCount()) {
+                    accept_challenge(s_incoming_challenge.ac_id);
+                }
+            }
             e_state = CLIENT_STATE_POLL_EVENTS;
             break;
 
@@ -304,6 +320,25 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
         {
             LOGW("error code %d", httpCode);
         }
+    }
+
+    client.end();
+
+    return b_status;
+}
+
+bool api_post(const char *endpoint, String payload, DynamicJsonDocument &response, bool b_debug)
+{
+    bool    b_status = false;
+
+    if (!client.begin(endpoint))
+    {
+        LOGW("begin(%s) failed", endpoint);
+    }
+    else
+    {
+        int httpCode = client.sendRequest("POST", (uint8_t *)payload.c_str(), payload.length());
+
     }
 
     client.end();

@@ -6,6 +6,9 @@
 namespace lichess
 {
 
+static DynamicJsonDocument  _rsp(2*1024);
+
+
 static inline challenge_type_et get_type(String &status)
 {
     challenge_type_et e_type = CHALLENGE_NONE;
@@ -100,6 +103,35 @@ int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge)
     }
 
     return CHALLENGE_NONE;
+}
+
+bool accept_challenge(const char *challengeId)
+{
+    LOGD("%s(%s)", __func__, challengeId);
+    // to do
+    delay(2000);
+    return false;
+}
+
+bool decline_challenge(const char *challengeId, const char *reason)
+{
+    String endpoint = "/challenge/";
+    String payload  = "reason=";
+    //LOGD("%s(%s)", __func__, challengeId);
+
+    endpoint += challengeId;
+    endpoint += "/decline";
+    payload  += reason ? reason : "generic";
+
+    return api_post(endpoint.c_str(), payload, _rsp, true);
+}
+
+bool cancel_challenge(const char *challengeId)
+{
+    LOGD("%s(%s)", __func__, challengeId);
+    // to do
+    delay(2000);
+    return false;
 }
 
 } // namespace lichess
