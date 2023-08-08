@@ -14,22 +14,30 @@
 namespace lichess
 {
 
-static ApiClient        client;                 // main connection (non-stream)
-static ApiClient        events_client;          // events-stream connection
-DynamicJsonDocument     response(2*1024);
+static ApiClient        main_client(false);     // main connection (non-stream)
+static ApiClient        events_client(true);    // events-stream connection
+static ApiClient        board_client(true);     // game_state-stream connection
 static challenge_st     s_incoming_challenge;
+static game_st          s_current_game;
+
+static char             ac_username[32];
+DynamicJsonDocument     response(2*1024);
+
 
 static enum {
     CLIENT_STATE_INIT,
     CLIENT_STATE_GET_ACCOUNT,   // check lichess account/profile
-    CLIENT_STATE_POLL_EVENTS,   // stream incoming events
+    CLIENT_STATE_CHECK_EVENTS,  // check messages from eventd-stream
+    CLIENT_STATE_CHECK_GAME,    // check messages from game-state stream
     CLIENT_STATE_IDLE
 } e_state;
 
 
-ApiClient::ApiClient() : HTTPClient(),
+ApiClient::ApiClient(bool b_stream) : HTTPClient(),
     _auth("Bearer "), _url(LICHESS_API_URL_PREFIX)
 {
+    setReuse(!b_stream);
+
     // to do: load from preferences
     _client.setCACert(LICHESS_ORG_PEM);
     _auth += LICHESS_API_ACCESS_TOKEN;
@@ -98,6 +106,9 @@ static bool get_account()
     bool b_status = false;
 
     SHOW_STATUS("lichess.org ...");
+
+    memset(ac_username, 0, sizeof(ac_username));
+
     if (!api_get("/account", response))
     {
         SHOW_STATUS("lichess response error");
@@ -111,7 +122,8 @@ static bool get_account()
     {
         const char *username = response["username"].as<const char*>();
         LOGI("username : %s", username);
-        SHOW_STATUS("user: %s", username);
+        strncpy(ac_username, username, sizeof(ac_username) - 1);
+        SHOW_STATUS("user: %.*s", 14, ac_username);
         b_status = true;
     }
 
@@ -144,28 +156,87 @@ static int poll_events()
             {
                 const char *type = response["type"].as<const char*>();
                 LOGD("event %s", type);
-                if (0 == strncmp(type, "challenge", strlen("challenge")))
+                if (0 == strncmp(type, "game", strlen("game")))
+                {
+                    result = parse_game_event(response, &s_current_game);
+                    DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
+                    if ((GAME_STATE_STARTED == result) && s_current_game.ac_id[0])
+                    {
+                        DISPLAY_TEXT1(0, 54, "<-Abort      Resign->");
+                        // ignore any incoming challenge
+                        memset(&s_incoming_challenge, 0, sizeof(s_incoming_challenge));
+                    }
+                }
+                else if (0 == strncmp(type, "challenge", strlen("challenge")))
                 {
                     challenge_st *pc = &s_incoming_challenge;
-                    DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
                     result = parse_challenge_event(response, pc);
                     if ((CHALLENGE_CREATED == result) && pc->ac_id[0] && pc->ac_user[0])
                     {
                         LOGI("incoming %s challenge '%s' from '%s' (%s %u+%u)", pc->b_rated ? "rated" : "casual",
                             pc->ac_id, pc->ac_user, pc->b_color ? "white" : "black",
                             pc->u16_clock_limit/60, pc->u8_clock_increment);
-                        DISPLAY_TEXT1(0, 45, "vs %.*s (%c %u+%u)", 7, pc->ac_user, pc->b_color ? 'B' : 'W',
-                                      pc->u16_clock_limit/60, pc->u8_clock_increment);
-                        DISPLAY_TEXT1(0, 54, "<-Accept    Decline->", pc->ac_id, pc->ac_user);
+                        if (GAME_STATE_UNKNOWN == s_current_game.e_state)
+                        {
+                            DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
+                            DISPLAY_TEXT1(0, 45, "vs %.*s (%c %u+%u)", 7, pc->ac_user, pc->b_color ? 'B' : 'W',
+                                        pc->u16_clock_limit/60, pc->u8_clock_increment);
+                            DISPLAY_TEXT1(0, 54, "<-Accept    Decline->");
+                        }
+                        else
+                        {
+                            memset(s_incoming_challenge.ac_id, 0, sizeof(s_incoming_challenge.ac_id));
+                        }
                         result = EVENT_CHALLENGE_INCOMING;
                     }
-                    else //if (result)
+                    else if (result)
                     {
                         LOGD("challenge -> %d", result);
                         memset(&s_incoming_challenge, 0, sizeof(s_incoming_challenge));
+                        DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
                         result = EVENT_CHALLENGE_CANCELED;
                     }
                 }
+            }
+        }
+
+    }
+    else if (board_client.connected())
+    {
+        result = 0;
+    }
+
+    return result;
+}
+
+static int poll_game_state()
+{
+    String  payload;
+    int     result = -1;
+
+    if (board_client.connected())
+    {
+        payload = board_client.streamResponse();
+        result  = 0;
+        if (payload.length() > 1)
+        {
+            LOGD("payload (%u): %s", payload.length(), payload.c_str());
+            response.clear();
+            DeserializationError error = deserializeJson(response, payload);
+            if (error)
+            {
+                LOGW("deserializeJson() failed: %s", error.f_str());
+            }
+            else if (!response.containsKey("type"))
+            {
+                LOGW("unknown game state");
+            }
+            else
+            {
+                const char *type = response["type"].as<const char*>();
+                LOGD("state: %s", type);
+
+                parse_game_state(response, &s_current_game);
             }
         }
 
@@ -183,6 +254,8 @@ static void taskClient(void *)
     for (;;)
     {
         WDT_FEED();
+
+        int event = EVENT_UNKNOWN;
 
         switch (e_state)
         {
@@ -203,7 +276,7 @@ static void taskClient(void *)
             {
                 if (events_client.startStream("/stream/event"))
                 {
-                    e_state = CLIENT_STATE_POLL_EVENTS;
+                    e_state = CLIENT_STATE_CHECK_EVENTS;
                 }
                 else
                 {
@@ -212,10 +285,27 @@ static void taskClient(void *)
             }
             break;
 
-        case CLIENT_STATE_POLL_EVENTS:
-            if (poll_events() < 0)
+        case CLIENT_STATE_CHECK_EVENTS:
+            event = poll_events();
+            if (event < 0)
             {
                 e_state = CLIENT_STATE_INIT;
+            }
+            else if (s_current_game.ac_id[0])
+            {
+                if ((GAME_STATE_STARTED == event) || (!board_client.connected()))
+                {
+#if 1 // close other stream to freeup resources
+                    events_client.end();
+                    delay(1000);
+#endif
+                    // api/board/game/stream/{gameId}
+                    String endpoint = "/board/game/stream/";
+                    endpoint += (const char *)s_current_game.ac_id;
+                    LOGI("monitor game %s", s_current_game.ac_id);
+                    board_client.startStream(endpoint.c_str());
+                }
+                e_state = CLIENT_STATE_CHECK_GAME;
             }
             else
             {
@@ -223,8 +313,21 @@ static void taskClient(void *)
             }
             break;
 
+        case CLIENT_STATE_CHECK_GAME:
+            poll_game_state();
+            e_state = CLIENT_STATE_IDLE;
+            break;
+
         case CLIENT_STATE_IDLE:
-            if (s_incoming_challenge.ac_id[0])
+            if (s_current_game.ac_id[0])
+            {
+                if (ui::btn::pb3.getCount()) {
+                    game_resign(s_current_game.ac_id);
+                } else if (ui::btn::pb2.getCount()) {
+                    game_abort(s_current_game.ac_id);
+                }
+            }
+            else if (s_incoming_challenge.ac_id[0])
             {
                 if (ui::btn::pb3.getCount()) {
                     decline_challenge(s_incoming_challenge.ac_id);
@@ -232,7 +335,7 @@ static void taskClient(void *)
                     accept_challenge(s_incoming_challenge.ac_id);
                 }
             }
-            e_state = CLIENT_STATE_POLL_EVENTS;
+            e_state = CLIENT_STATE_CHECK_EVENTS;
             break;
 
         default:
@@ -251,10 +354,14 @@ static void taskClient(void *)
 
 void init(void)
 {
-    e_state = CLIENT_STATE_INIT;
-
     // use default memory allocation - can also handle PSRAM up to 4MB
     mbedtls_platform_set_calloc_free(calloc, free);
+
+    memset(&s_incoming_challenge, 0, sizeof(s_incoming_challenge));
+    memset(&s_current_game, 0, sizeof(s_current_game));
+    memset(ac_username, 0, sizeof(ac_username));
+
+    e_state = CLIENT_STATE_INIT;
 
 #if 1
     xTaskCreate(
@@ -281,16 +388,16 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
 {
     bool    b_status = false;
 
-    if (!client.begin(endpoint))
+    if (!main_client.begin(endpoint))
     {
         LOGW("begin(%s) failed", endpoint);
     }
     else
     {
-        int httpCode = client.sendRequest("GET");
+        int httpCode = main_client.sendRequest("GET");
         if (httpCode > 0)
         {
-            String payload = client.getString();
+            String payload = main_client.getString();
             if (b_debug) {
                 LOGD("payload (%u):\r\n%s", payload.length(), payload.c_str());
             }
@@ -313,7 +420,7 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
             }
             else
             {
-                LOGW("GET %s failed: %s", endpoint, client.errorToString(httpCode).c_str());
+                LOGW("GET %s failed: %s", endpoint, main_client.errorToString(httpCode).c_str());
             }
         }
         else
@@ -322,26 +429,58 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
         }
     }
 
-    client.end();
+    main_client.end();
 
     return b_status;
 }
 
-bool api_post(const char *endpoint, String payload, DynamicJsonDocument &response, bool b_debug)
+bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, bool b_debug)
 {
     bool    b_status = false;
 
-    if (!client.begin(endpoint))
+    if (!main_client.begin(endpoint))
     {
         LOGW("begin(%s) failed", endpoint);
     }
     else
     {
-        int httpCode = client.sendRequest("POST", (uint8_t *)payload.c_str(), payload.length());
+        int httpCode = main_client.sendRequest("POST", (uint8_t *)payload.c_str(), payload.length());
+        if (httpCode > 0)
+        {
+            String payload = main_client.getString();
+            if (b_debug) {
+                LOGD("payload (%u):\r\n%s", payload.length(), payload.c_str());
+            }
+
+            if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))
+            {
+                if (payload.length() > 0)
+                {
+                    json.clear();
+                    DeserializationError error = deserializeJson(json, payload);
+                    if (error)
+                    {
+                        LOGW("deserializeJson() failed: %s", error.f_str());
+                    }
+                    else
+                    {
+                        b_status = true;
+                    }
+                }
+            }
+            else
+            {
+                LOGW("GET %s failed: %s", endpoint, main_client.errorToString(httpCode).c_str());
+            }
+        }
+        else
+        {
+            LOGW("error code %d", httpCode);
+        }
 
     }
 
-    client.end();
+    main_client.end();
 
     return b_status;
 }

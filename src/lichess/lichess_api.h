@@ -15,7 +15,7 @@ namespace lichess
 class ApiClient : public HTTPClient
 {
 public:
-    ApiClient();
+    ApiClient(bool b_stream=false);
 
     bool begin(const char *endpoint);
     int sendRequest(const char *type, uint8_t *payload=NULL, size_t size=0);

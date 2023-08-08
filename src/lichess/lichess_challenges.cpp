@@ -107,10 +107,13 @@ int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge)
 
 bool accept_challenge(const char *challengeId)
 {
-    LOGD("%s(%s)", __func__, challengeId);
-    // to do
-    delay(2000);
-    return false;
+    String endpoint = "/challenge/";
+    //LOGD("%s(%s)", __func__, challengeId);
+
+    endpoint += challengeId;
+    endpoint += "/accept";
+
+    return api_post(endpoint.c_str(), "", _rsp, true);
 }
 
 bool decline_challenge(const char *challengeId, const char *reason)
@@ -130,7 +133,7 @@ bool cancel_challenge(const char *challengeId)
 {
     LOGD("%s(%s)", __func__, challengeId);
     // to do
-    delay(2000);
+    delay(1000);
     return false;
 }
 
