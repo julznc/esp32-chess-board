@@ -28,6 +28,7 @@ typedef enum
     GAME_STREAM_STATE_UNKNOWN,
     GAME_STREAM_STATE_FULL,         // "gameFull"
     GAME_STREAM_STATE_CURRENT,      // "gameState"
+    GAME_STREAM_STATE_FINISH,       // "gameFinish" from /api/stream/event
     GAME_STREAM_STATE_CHATLINE,     // "chatLine"
     GAME_STREAM_STATE_OPPONENTGONE, // "opponentGone"
 } game_stream_state_et;

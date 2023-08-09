@@ -9,6 +9,60 @@ namespace lichess
 static DynamicJsonDocument  _rsp(2*1024);
 
 
+static inline game_stream_state_et get_stream_state(String &type)
+{
+    game_stream_state_et e_state = GAME_STREAM_STATE_UNKNOWN;
+
+    if (type == "gameFull") {
+        e_state = GAME_STREAM_STATE_FULL;
+    } else if (type == "gameState") {
+        e_state = GAME_STREAM_STATE_CURRENT;
+    } else if (type == "gameFinish") {
+        e_state = GAME_STREAM_STATE_FINISH;
+    } else if (type == "chatLine") {
+        e_state = GAME_STREAM_STATE_CHATLINE;
+    } else if (type == "opponentGone") {
+        e_state = GAME_STREAM_STATE_OPPONENTGONE;
+    }
+
+    return e_state;
+}
+
+static inline game_state_et get_state(String &status)
+{
+    game_state_et e_state = GAME_STATE_UNKNOWN;
+
+    if (status == "created") {
+        e_state = GAME_STATE_CREATED;
+    } else if (status == "started") {
+        e_state = GAME_STATE_STARTED;
+    } else if (status == "aborted") {
+        e_state = GAME_STATE_ABORTED;
+    } else if (status == "mate") {
+        e_state = GAME_STATE_MATE;
+    } else if (status == "resign") {
+        e_state = GAME_STATE_RESIGN;
+    } else if (status == "stalemate") {
+        e_state = GAME_STATE_STALEMATE;
+    } else if (status == "timeout") {
+        e_state = GAME_STATE_TIMEOUT;
+    } else if (status == "draw") {
+        e_state = GAME_STATE_DRAW;
+    } else if (status == "outoftime") {
+        e_state = GAME_STATE_OUTOFTIME;
+    } else if (status == "cheat") {
+        e_state = GAME_STATE_CHEAT;
+    } else if (status == "noStart") {
+        e_state = GAME_STATE_NOSTART;
+    } else if (status == "unknownFinish") {
+        e_state = GAME_STATE_UNKNOWNFINISH;
+    } else if (status == "variantEnd") {
+        e_state = GAME_STATE_VARIANTEND;
+    }
+
+    return e_state;
+}
+
 int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/)
 {
     if (json.containsKey("game"))
@@ -46,8 +100,37 @@ int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/)
 {
     if (json.containsKey("type"))
     {
-        const char *type = json["type"].as<const char*>();
-        LOGD("event %s", type);
+        String type = json["type"].as<const char*>();
+        LOGD("event %s", type.c_str());
+
+        game_stream_state_et e_type = get_stream_state(type);
+        if (GAME_STREAM_STATE_FULL == e_type)
+        {
+            JsonObject obj    = json["state"].as<JsonObject>();
+            String     status = obj["status"].as<const char*>();
+            LOGI("full: %s", status.c_str());
+            ps_game->e_state = get_state(status);
+        }
+        else if (GAME_STREAM_STATE_CURRENT == e_type)
+        {
+            String status = json["status"].as<const char*>();
+            LOGI("state: %s", status.c_str());
+            ps_game->e_state = get_state(status);
+        }
+        else if (GAME_STREAM_STATE_FINISH == e_type)
+        {
+            JsonObject game   = json["game"].as<JsonObject>();
+            JsonObject obj    = game["status"].as<JsonObject>();
+            String     status = obj["name"].as<const char*>();
+            LOGI("finish: %s", status.c_str());
+            ps_game->e_state = get_state(status);
+        }
+        else
+        {
+            LOGW("not yet supported stream state %d", e_type);
+        }
+
+        return ps_game->e_state;
     }
     return GAME_STATE_UNKNOWN;
 }

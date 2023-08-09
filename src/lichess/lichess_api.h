@@ -15,12 +15,14 @@ namespace lichess
 class ApiClient : public HTTPClient
 {
 public:
-    ApiClient(bool b_stream=false);
+    ApiClient();
 
     bool begin(const char *endpoint);
     int sendRequest(const char *type, uint8_t *payload=NULL, size_t size=0);
     bool startStream(const char *endpoint);
     String streamResponse();
+
+    const String &getEndpoint(void) const { return _uri; }
 
 private:
     String              _auth;

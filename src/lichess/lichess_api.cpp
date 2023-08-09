@@ -7,16 +7,17 @@
 #include "lichess_api.h"
 
 
-#define SHOW_STATUS(msg, ...)       DISPLAY_CLEAR_ROW(20, 8); \
-                                    DISPLAY_TEXT1(0, 20, msg, ## __VA_ARGS__)
-
+#define SHOW_STATUS(msg, ...)       DISPLAY_CLEAR_ROW(10, 8); \
+                                    DISPLAY_TEXT1(0, 10, msg, ## __VA_ARGS__)
+#define SET_BOTTOM_MENU(msg, ...)   DISPLAY_CLEAR_ROW(54, 9); \
+                                    DISPLAY_TEXT1(0, 54, msg, ## __VA_ARGS__)
+#define CLEAR_BOTTOM_MENU()         SET_BOTTOM_MENU("")
 
 namespace lichess
 {
 
-static ApiClient        main_client(false);     // main connection (non-stream)
-static ApiClient        events_client(true);    // events-stream connection
-static ApiClient        board_client(true);     // game_state-stream connection
+static ApiClient        main_client;    // main connection (non-stream)
+static ApiClient        stream_client;  // both events-stream & board-state-stream connections
 static challenge_st     s_incoming_challenge;
 static game_st          s_current_game;
 
@@ -33,11 +34,9 @@ static enum {
 } e_state;
 
 
-ApiClient::ApiClient(bool b_stream) : HTTPClient(),
+ApiClient::ApiClient() : HTTPClient(),
     _auth("Bearer "), _url(LICHESS_API_URL_PREFIX)
 {
-    setReuse(!b_stream);
-
     // to do: load from preferences
     _client.setCACert(LICHESS_ORG_PEM);
     _auth += LICHESS_API_ACCESS_TOKEN;
@@ -123,7 +122,7 @@ static bool get_account()
         const char *username = response["username"].as<const char*>();
         LOGI("username : %s", username);
         strncpy(ac_username, username, sizeof(ac_username) - 1);
-        SHOW_STATUS("user: %.*s", 14, ac_username);
+        SHOW_STATUS("%.*s", 20, ac_username);
         b_status = true;
     }
 
@@ -135,11 +134,22 @@ static int poll_events()
     String  payload;
     int     result = -1;
 
-    if (events_client.connected())
+    if (!stream_client.getEndpoint().startsWith("/api/stream/event"))
     {
-        payload = events_client.streamResponse();
+        return  0; // ignore, not for us
+    }
+
+    while (stream_client.connected())
+    {
+        payload = stream_client.streamResponse();
         result  = 0;
-        if (payload.length() > 1)
+
+        if (0 == payload.length())
+        {
+            break; // empty
+        }
+
+        if (payload.length() > 8 /* {"x":"y"} */)
         {
             LOGD("payload (%u): %s", payload.length(), payload.c_str());
             response.clear();
@@ -162,7 +172,7 @@ static int poll_events()
                     DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
                     if ((GAME_STATE_STARTED == result) && s_current_game.ac_id[0])
                     {
-                        DISPLAY_TEXT1(0, 54, "<-Abort      Resign->");
+                        SET_BOTTOM_MENU("<-Abort      Resign->");
                         // ignore any incoming challenge
                         memset(&s_incoming_challenge, 0, sizeof(s_incoming_challenge));
                     }
@@ -179,9 +189,9 @@ static int poll_events()
                         if (GAME_STATE_UNKNOWN == s_current_game.e_state)
                         {
                             DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
-                            DISPLAY_TEXT1(0, 45, "vs %.*s (%c %u+%u)", 7, pc->ac_user, pc->b_color ? 'B' : 'W',
+                            DISPLAY_TEXT1(0, 45, "%.*s(%c %u+%u)", 12, pc->ac_user, pc->b_color ? 'B' : 'W',
                                         pc->u16_clock_limit/60, pc->u8_clock_increment);
-                            DISPLAY_TEXT1(0, 54, "<-Accept    Decline->");
+                            SET_BOTTOM_MENU("<-Accept    Decline->");
                         }
                         else
                         {
@@ -199,11 +209,7 @@ static int poll_events()
                 }
             }
         }
-
-    }
-    else if (board_client.connected())
-    {
-        result = 0;
+        delay(100);
     }
 
     return result;
@@ -214,11 +220,22 @@ static int poll_game_state()
     String  payload;
     int     result = -1;
 
-    if (board_client.connected())
+    if (!stream_client.getEndpoint().startsWith("/api/board/game/stream"))
     {
-        payload = board_client.streamResponse();
+        return  0; // ignore, not for us
+    }
+
+    while (stream_client.connected())
+    {
+        payload = stream_client.streamResponse();
         result  = 0;
-        if (payload.length() > 1)
+
+        if (0 == payload.length())
+        {
+            break; // empty
+        }
+
+        if (payload.length() > 8 /* {"x":"y"} */)
         {
             LOGD("payload (%u): %s", payload.length(), payload.c_str());
             response.clear();
@@ -234,9 +251,8 @@ static int poll_game_state()
             else
             {
                 const char *type = response["type"].as<const char*>();
-                LOGD("state: %s", type);
-
-                parse_game_state(response, &s_current_game);
+                result = parse_game_state(response, &s_current_game);
+                LOGD("%s: %d", type, result);
             }
         }
 
@@ -266,7 +282,6 @@ static void taskClient(void *)
             }
             else
             {
-                SHOW_STATUS("lichess offline");
                 delay(1500UL);
             }
             break;
@@ -274,8 +289,9 @@ static void taskClient(void *)
         case CLIENT_STATE_GET_ACCOUNT:
             if (get_account())
             {
-                if (events_client.startStream("/stream/event"))
+                if (stream_client.startStream("/stream/event"))
                 {
+                    LOGI("monitor events ok");
                     e_state = CLIENT_STATE_CHECK_EVENTS;
                 }
                 else
@@ -293,17 +309,16 @@ static void taskClient(void *)
             }
             else if (s_current_game.ac_id[0])
             {
-                if ((GAME_STATE_STARTED == event) || (!board_client.connected()))
+                if (!stream_client.getEndpoint().startsWith("/api/board/game/stream"))
                 {
-#if 1 // close other stream to freeup resources
-                    events_client.end();
+                    stream_client.end();
                     delay(1000);
-#endif
+
                     // api/board/game/stream/{gameId}
                     String endpoint = "/board/game/stream/";
                     endpoint += (const char *)s_current_game.ac_id;
-                    LOGI("monitor game %s", s_current_game.ac_id);
-                    board_client.startStream(endpoint.c_str());
+                    bool b_started = stream_client.startStream(endpoint.c_str());
+                    LOGI("monitor game '%s' %s", s_current_game.ac_id, b_started ? "ok" : "failed");
                 }
                 e_state = CLIENT_STATE_CHECK_GAME;
             }
@@ -314,24 +329,44 @@ static void taskClient(void *)
             break;
 
         case CLIENT_STATE_CHECK_GAME:
-            poll_game_state();
-            e_state = CLIENT_STATE_IDLE;
+            if (poll_game_state() < 0)
+            {
+                LOGD("disconnected ?");
+                e_state = CLIENT_STATE_INIT;
+            }
+            else if (s_current_game.e_state > GAME_STATE_STARTED)
+            {
+                LOGD("end game stream");
+                stream_client.end();
+                memset(&s_current_game, 0, sizeof(s_current_game));
+                CLEAR_BOTTOM_MENU();
+                delay(1000);
+                e_state = CLIENT_STATE_INIT;
+            }
+            else
+            {
+                e_state = CLIENT_STATE_IDLE;
+            }
             break;
 
         case CLIENT_STATE_IDLE:
             if (s_current_game.ac_id[0])
             {
                 if (ui::btn::pb3.getCount()) {
+                    CLEAR_BOTTOM_MENU();
                     game_resign(s_current_game.ac_id);
                 } else if (ui::btn::pb2.getCount()) {
+                    CLEAR_BOTTOM_MENU();
                     game_abort(s_current_game.ac_id);
                 }
             }
             else if (s_incoming_challenge.ac_id[0])
             {
                 if (ui::btn::pb3.getCount()) {
+                    CLEAR_BOTTOM_MENU();
                     decline_challenge(s_incoming_challenge.ac_id);
                 } else if (ui::btn::pb2.getCount()) {
+                    CLEAR_BOTTOM_MENU();
                     accept_challenge(s_incoming_challenge.ac_id);
                 }
             }
@@ -361,6 +396,7 @@ void init(void)
     memset(&s_current_game, 0, sizeof(s_current_game));
     memset(ac_username, 0, sizeof(ac_username));
 
+    stream_client.setReuse(false);
     e_state = CLIENT_STATE_INIT;
 
 #if 1
