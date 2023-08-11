@@ -228,7 +228,7 @@ static inline void do_move(move_st *list, move_st *move)
 
     memcpy(au8_prev_pieces, pu8_pieces, sizeof(au8_prev_pieces));
     memcpy(&last_move, move, sizeof(move_st));
-    //memset(&pending_move, 0, sizeof(move_st));
+    memset(&pending_move, 0, sizeof(move_st));
 
     if (move->flags & BIT_PROMOTION) {
         // set actual promoted piece
@@ -476,6 +476,97 @@ const char *piece_to_string(uint8_t u7_type)
     #undef STR_PIECE
     }
     return "UNKNOWN";
+}
+
+const stats_st *get_position(String &fen /*current position*/, String &move /*last move*/)
+{
+    lock();
+    fen = generate_fen(&st_game);
+    unlock();
+
+    (void)get_last_move(move);
+    return &st_game.stats;
+}
+
+bool get_last_move(String &move)
+{
+    bool b_status = false;
+
+    lock();
+    if (!st_game.history)
+    {
+        move = "0000";
+    }
+    else
+    {
+        move  = (char)('a' + FILE(last_move.from));
+        move += (char)('0' + 8 - RANK(last_move.from));
+        move += (char)('a' + FILE(last_move.to));
+        move += (char)('0' + 8 - RANK(last_move.to));
+        if (last_move.flags & BIT_PROMOTION) {
+            move += (char)PIECE_TYPE(st_game.board[last_move.to]);
+        }
+        b_status = true;
+    }
+    unlock();
+
+    return b_status;
+}
+
+bool get_pgn(String &pgn)
+{
+    uint16_t total_moves = st_game.stats.move_number;
+
+    lock();
+
+    if (WHITE == st_game.stats.turn) {
+        total_moves--;
+    }
+
+    for (uint16_t move_num = 1; move_num <= total_moves; move_num++)
+    {
+        pgn += String(move_num);
+        pgn += ". ";
+        pgn += (const char *)s_move_stack[move_num -1].san_white;
+        pgn += " ";
+        pgn += (const char *)s_move_stack[move_num -1].san_black;
+        pgn += " ";
+    }
+
+    unlock();
+    return true;
+}
+
+bool queue_move(const String &move)
+{
+    //LOGD("%s(%s)", __func__, move.c_str());
+    if (move.length() > 3)
+    {
+        char from_file = move.charAt(0);
+        char from_rank = move.charAt(1);
+        char to_file   = move.charAt(2);
+        char to_rank   = move.charAt(3);
+        int8_t from_sq = ((7 - (from_rank - '1')) << 4) + (from_file - 'a');
+        int8_t to_sq   = ((7 - (to_rank - '1')) << 4) + (to_file - 'a');
+        if ((from_sq < a8) || (from_sq > h1) || (to_sq < a8) || (to_sq > h1))
+        {
+            LOGW("invalid coord %d %d", from_sq, to_sq);
+        }
+        else
+        {
+            if ((to_sq != pending_move.to) || (from_sq != pending_move.from))
+            {
+                LOGD("queue %c%u %c%u", ALGEBRAIC(from_sq), ALGEBRAIC(to_sq));
+                lock();
+                pending_move.piece = st_game.board[from_sq];
+                pending_move.from = from_sq;
+                pending_move.to   = to_sq;
+                unlock();
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace chess

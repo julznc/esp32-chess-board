@@ -123,6 +123,12 @@ void clear_moves(move_st **plist);
 const char *color_to_string(uint8_t b_color);
 const char *piece_to_string(uint8_t u7_type);
 
+// api's
+const stats_st *get_position(String &fen /*current position*/, String &move /*last move*/);
+bool get_last_move(String &move /*uci*/);
+bool get_pgn(String &pgn);
+bool queue_move(const String &move);
+
 
 } // namespace chess
 
