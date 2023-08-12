@@ -1,5 +1,6 @@
 
 #include "globals.h"
+#include "chess/chess.h"
 #include "ui/ui.h"
 #include "wifi/wifi_setup.h"
 
@@ -34,17 +35,33 @@ static enum {
 } e_state;
 
 
+ApiClient::SecClient::SecClient() : WiFiClientSecure()
+{
+    // to do: load from preferences
+    _CA_cert = LICHESS_ORG_PEM; // setCACert()
+}
+
 ApiClient::ApiClient() : HTTPClient(),
     _auth("Bearer "), _url(LICHESS_API_URL_PREFIX)
 {
     // to do: load from preferences
-    _client.setCACert(LICHESS_ORG_PEM);
     _auth += LICHESS_API_ACCESS_TOKEN;
 }
 
 bool ApiClient::begin(const char *endpoint)
 {
-    return HTTPClient::begin(_client, _url + endpoint);
+    return HTTPClient::begin(_secClient, _url + endpoint);
+}
+
+void ApiClient::end(bool b_stop)
+{
+    if (_secClient.available()) {
+        _secClient.flush();
+    }
+    if (b_stop) {
+        _secClient.stop();
+    }
+    clear();
 }
 
 int ApiClient::sendRequest(const char *type, uint8_t *payload, size_t size)
@@ -85,14 +102,18 @@ bool ApiClient::startStream(const char *endpoint)
         }
     }
 
+    if (!b_status) {
+        end(true);
+    }
+
     return b_status;
 }
 
 String ApiClient::streamResponse()
 {
-    if (_client.available())
+    if (_secClient.available())
     {
-        String line = _client.readStringUntil('\n');
+        String line = _secClient.readStringUntil('\n');
         line.trim(); // remove \r
         return line;
     }
@@ -110,7 +131,7 @@ static bool get_account()
 
     if (!api_get("/account", response))
     {
-        SHOW_STATUS("lichess response error");
+        SHOW_STATUS("lichess api error");
     }
     else if (!response.containsKey("username"))
     {
@@ -299,6 +320,11 @@ static void taskClient(void *)
                     e_state = CLIENT_STATE_IDLE;
                 }
             }
+            else
+            {
+                delay(5000UL);
+                e_state = CLIENT_STATE_INIT;
+            }
             break;
 
         case CLIENT_STATE_CHECK_EVENTS:
@@ -311,7 +337,7 @@ static void taskClient(void *)
             {
                 if (!stream_client.getEndpoint().startsWith("/api/board/game/stream"))
                 {
-                    stream_client.end();
+                    stream_client.end(true);
                     delay(1000);
 
                     // api/board/game/stream/{gameId}
@@ -337,7 +363,7 @@ static void taskClient(void *)
             else if (s_current_game.e_state > GAME_STATE_STARTED)
             {
                 LOGD("end game stream");
-                stream_client.end();
+                stream_client.end(true);
                 memset(&s_current_game, 0, sizeof(s_current_game));
                 CLEAR_BOTTOM_MENU();
                 delay(1000);
@@ -422,7 +448,8 @@ void init(void)
  */
 bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
 {
-    bool    b_status = false;
+    bool b_status = false;
+    bool b_stop   = false;
 
     if (!main_client.begin(endpoint))
     {
@@ -462,17 +489,19 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
         else
         {
             LOGW("error code %d", httpCode);
+            b_stop = true;
         }
     }
 
-    main_client.end();
+    main_client.end(b_stop);
 
     return b_status;
 }
 
 bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, bool b_debug)
 {
-    bool    b_status = false;
+    bool b_status = false;
+    bool b_stop   = false;
 
     if (!main_client.begin(endpoint))
     {
@@ -512,11 +541,12 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
         else
         {
             LOGW("error code %d", httpCode);
+            b_stop = true;
         }
 
     }
 
-    main_client.end();
+    main_client.end(b_stop);
 
     return b_status;
 }

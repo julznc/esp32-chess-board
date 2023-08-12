@@ -364,7 +364,7 @@ void setup(void)
     xTaskCreate(
         taskWiFi,       /* Task function. */
         "taskWiFi",     /* String with name of task. */
-        16384,          /* Stack size in bytes. */
+        16*1024,        /* Stack size in bytes. */
         NULL,           /* Parameter passed as input of the task */
         3,              /* Priority of the task. */
         NULL);          /* Task handle. */

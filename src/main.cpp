@@ -10,6 +10,8 @@ void setup()
 {
     global_init();
 
+    WDT_WATCH(NULL);
+
     ui::init();
     brd::init();
     lichess::init();
@@ -18,9 +20,7 @@ void setup()
 
 void loop()
 {
-    LED_ON();
-    delay(500);
-    LED_OFF();
-    delay(500);
     WDT_FEED();
+    brd::loop();
+    LED_TOGGLE();
 }

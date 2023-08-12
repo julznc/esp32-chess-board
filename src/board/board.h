@@ -20,6 +20,7 @@ namespace brd
 
 
 void init(void);
+void loop(void);
 const uint8_t *pu8_pieces(void);
 const uint32_t *pu32_toggle_ms(void);
 

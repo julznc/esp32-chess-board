@@ -288,53 +288,6 @@ static void scan(void)
     //LOGD("scan done");
 }
 
-static void taskBoard(void *)
-{
-    WDT_WATCH(NULL);
-
-    for(;;)
-    {
-        WDT_FEED();
-
-        switch (e_state)
-        {
-        case BRD_STATE_INIT:
-            if (checkSquares() && checkSquares()) // check 2x
-            {
-                animate_squares();
-                scan(); // initial scan
-                chess::init();
-                e_state = BRD_STATE_SCAN;
-            }
-            else
-            {
-                delay(3000);
-            }
-            break;
-
-        case BRD_STATE_SCAN:
-            if (ui::btn::pb1.pressedDuration() > 5000UL)
-            {
-                e_state = BRD_STATE_INIT;
-            }
-            else
-            {
-                //uint32_t ms_start = millis();
-                scan();
-                //LOGD("scan duration %lu ms", millis() - ms_start);
-                chess::loop();
-            }
-            break;
-
-        default:
-            e_state = BRD_STATE_INIT;
-            break;
-        }
-
-        delay(2);
-    }
-}
-
 void init(void)
 {
     memset(au8_pieces, 0, sizeof(au8_pieces));
@@ -357,14 +310,46 @@ void init(void)
     spiRFID.begin(RFID_SCK_PIN, RFID_MISO_PIN, RFID_MOSI_PIN, RFID_SS_PIN);
 
     e_state = BRD_STATE_INIT;
+}
 
-    xTaskCreate(
-        taskBoard,      /* Task function. */
-        "taskBoard",    /* String with name of task. */
-        16*1024,        /* Stack size in bytes. */
-        NULL,           /* Parameter passed as input of the task */
-        3,              /* Priority of the task. */
-        NULL);          /* Task handle. */
+void loop(void)
+{
+    switch (e_state)
+    {
+    case BRD_STATE_INIT:
+        if (checkSquares() && checkSquares()) // check 2x
+        {
+            animate_squares();
+            scan(); // initial scan
+            chess::init();
+            e_state = BRD_STATE_SCAN;
+        }
+        else
+        {
+            delay(3000);
+        }
+        break;
+
+    case BRD_STATE_SCAN:
+        if (ui::btn::pb1.pressedDuration() > 5000UL)
+        {
+            e_state = BRD_STATE_INIT;
+        }
+        else
+        {
+            //uint32_t ms_start = millis();
+            scan();
+            //LOGD("scan duration %lu ms", millis() - ms_start);
+            chess::loop();
+        }
+        break;
+
+    default:
+        e_state = BRD_STATE_INIT;
+        break;
+    }
+
+    delay(2);
 }
 
 const uint8_t *pu8_pieces(void)

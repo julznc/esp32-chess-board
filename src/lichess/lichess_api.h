@@ -14,10 +14,16 @@ namespace lichess
 
 class ApiClient : public HTTPClient
 {
+    class SecClient : public WiFiClientSecure
+    {
+    public:
+        SecClient();
+    };
 public:
     ApiClient();
 
     bool begin(const char *endpoint);
+    void end(bool b_stop /*close ssl connection*/);
     int sendRequest(const char *type, uint8_t *payload=NULL, size_t size=0);
     bool startStream(const char *endpoint);
     String streamResponse();
@@ -25,9 +31,9 @@ public:
     const String &getEndpoint(void) const { return _uri; }
 
 private:
-    String              _auth;
-    String              _url;
-    WiFiClientSecure    _client;
+    String      _auth;
+    String      _url;
+    SecClient   _secClient;
 };
 
 typedef enum

@@ -72,9 +72,9 @@ void init(void)
     xTaskCreate(
         taskUI,         /* Task function. */
         "taskUI",       /* String with name of task. */
-        16*1024,        /* Stack size in bytes. */
+        8*1024,         /* Stack size in bytes. */
         NULL,           /* Parameter passed as input of the task */
-        4,              /* Priority of the task. */
+        2,              /* Priority of the task. */
         NULL);          /* Task handle. */
 }
 
