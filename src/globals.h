@@ -8,7 +8,7 @@
 
 // app firmware info
 #define K_APP_NAME                  "Electronic Chess Board"
-#define K_APP_VERSION               "01.04.11"
+#define K_APP_VERSION               "01.04.12"
 
 
 // for esp32-s2: RX1=18, TX1=17
