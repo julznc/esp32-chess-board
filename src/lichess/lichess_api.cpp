@@ -10,9 +10,11 @@
 
 #define SHOW_STATUS(msg, ...)       DISPLAY_CLEAR_ROW(10, 8); \
                                     DISPLAY_TEXT1(0, 10, msg, ## __VA_ARGS__)
+#define SET_BOTTOM_MSG(msg, ...)    DISPLAY_CLEAR_ROW(45, 9); \
+                                    DISPLAY_TEXT1(0, 45, msg, ## __VA_ARGS__)
 #define SET_BOTTOM_MENU(msg, ...)   DISPLAY_CLEAR_ROW(54, 9); \
                                     DISPLAY_TEXT1(0, 54, msg, ## __VA_ARGS__)
-#define CLEAR_BOTTOM_MENU()         SET_BOTTOM_MENU("")
+#define CLEAR_BOTTOM_MENU()         DISPLAY_CLEAR_ROW(45, 18);
 
 namespace lichess
 {
@@ -31,6 +33,7 @@ static enum {
     CLIENT_STATE_GET_ACCOUNT,   // check lichess account/profile
     CLIENT_STATE_CHECK_EVENTS,  // check messages from eventd-stream
     CLIENT_STATE_CHECK_GAME,    // check messages from game-state stream
+    CLIENT_STATE_CHECK_BOARD,   // get board status
     CLIENT_STATE_IDLE
 } e_state;
 
@@ -209,9 +212,8 @@ static int poll_events()
                             pc->u16_clock_limit/60, pc->u8_clock_increment);
                         if (GAME_STATE_UNKNOWN == s_current_game.e_state)
                         {
-                            DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
-                            DISPLAY_TEXT1(0, 45, "%.*s(%c %u+%u)", 12, pc->ac_user, pc->b_color ? 'B' : 'W',
-                                        pc->u16_clock_limit/60, pc->u8_clock_increment);
+                            SET_BOTTOM_MSG("%.*s(%c %u+%u)", 12, pc->ac_user, pc->b_color ? 'B' : 'W',
+                                            pc->u16_clock_limit/60, pc->u8_clock_increment);
                             SET_BOTTOM_MENU("<-Accept    Decline->");
                         }
                         else
@@ -284,6 +286,7 @@ static int poll_game_state()
 
 static void taskClient(void *)
 {
+    String fen = "";
     WDT_WATCH(NULL);
 
     delay(2500UL);
@@ -350,7 +353,7 @@ static void taskClient(void *)
             }
             else
             {
-                e_state = CLIENT_STATE_IDLE;
+                e_state = CLIENT_STATE_CHECK_BOARD;
             }
             break;
 
@@ -371,8 +374,20 @@ static void taskClient(void *)
             }
             else
             {
-                e_state = CLIENT_STATE_IDLE;
+                e_state = CLIENT_STATE_CHECK_BOARD;
             }
+            break;
+
+        case CLIENT_STATE_CHECK_BOARD:
+            if (fen.isEmpty()) // if not yet started
+            {
+                if (chess::get_position(fen))
+                {
+                    SET_BOTTOM_MSG ("Play from position ?");
+                    SET_BOTTOM_MENU("<-Black       White->");
+                }
+            }
+            e_state = CLIENT_STATE_IDLE;
             break;
 
         case CLIENT_STATE_IDLE:
@@ -394,6 +409,23 @@ static void taskClient(void *)
                 } else if (ui::btn::pb2.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     accept_challenge(s_incoming_challenge.ac_id);
+                }
+            }
+            else if (!fen.isEmpty())
+            {
+                challenge_st s_out; // outgoing challenge
+                strncpy(s_out.ac_user, "ai", sizeof(s_out.ac_user) - 1);
+                s_out.b_rated = false;
+                s_out.u16_clock_limit = 15 * 60;
+                s_out.u8_clock_increment = 10;
+                if (ui::btn::pb3.getCount()) {
+                    CLEAR_BOTTOM_MENU();
+                    s_out.b_color = true;
+                    create_challenge(&s_out, fen.c_str());
+                } else if (ui::btn::pb2.getCount()) {
+                    CLEAR_BOTTOM_MENU();
+                    s_out.b_color = false;
+                    create_challenge(&s_out, fen.c_str());
                 }
             }
             e_state = CLIENT_STATE_CHECK_EVENTS;
@@ -509,20 +541,25 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
     }
     else
     {
+        if (!payload.isEmpty())
+        {
+            main_client.addHeader("Content-Type", "application/x-www-form-urlencoded");
+        }
+
         int httpCode = main_client.sendRequest("POST", (uint8_t *)payload.c_str(), payload.length());
         if (httpCode > 0)
         {
-            String payload = main_client.getString();
+            String resp = main_client.getString();
             if (b_debug) {
-                LOGD("payload (%u):\r\n%s", payload.length(), payload.c_str());
+                LOGD("response (%u):\r\n%s", resp.length(), resp.c_str());
             }
 
-            if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))
+            if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_CREATED == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))
             {
-                if (payload.length() > 0)
+                if (resp.length() > 0)
                 {
                     json.clear();
-                    DeserializationError error = deserializeJson(json, payload);
+                    DeserializationError error = deserializeJson(json, resp);
                     if (error)
                     {
                         LOGW("deserializeJson() failed: %s", error.f_str());

@@ -583,7 +583,7 @@ const char *generate_fen(const game_st *p_game)
 
     *fen++ = ' ';
     if (!p_game->stats.ep_square) {
-        *fen++ = '-'; // todo: ep
+        *fen++ = '-';
     } else {
         *fen++ = 'a' + FILE(p_game->stats.ep_square);
         *fen++ = '0' + 8 - RANK(p_game->stats.ep_square);
@@ -630,6 +630,19 @@ const stats_st *get_position(String &fen /*current position*/, String &move /*la
 
     (void)get_last_move(move);
     return &st_game.stats;
+}
+
+bool get_position(String &fen)
+{
+    bool b_status = false;
+    lock();
+    b_status = b_valid_posision;
+    if (b_status)
+    {
+        fen = generate_fen(&st_game);
+    }
+    unlock();
+    return b_status;
 }
 
 bool get_last_move(String &move)

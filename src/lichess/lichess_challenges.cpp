@@ -105,33 +105,63 @@ int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge)
     return CHALLENGE_NONE;
 }
 
-bool accept_challenge(const char *challengeId)
+bool accept_challenge(const char *challenge_id)
 {
     String endpoint = "/challenge/";
-    //LOGD("%s(%s)", __func__, challengeId);
+    //LOGD("%s(%s)", __func__, challenge_id);
 
-    endpoint += challengeId;
+    endpoint += challenge_id;
     endpoint += "/accept";
 
     return api_post(endpoint.c_str(), "", _rsp, true);
 }
 
-bool decline_challenge(const char *challengeId, const char *reason)
+bool decline_challenge(const char *challenge_id, const char *reason)
 {
     String endpoint = "/challenge/";
     String payload  = "reason=";
-    //LOGD("%s(%s)", __func__, challengeId);
+    //LOGD("%s(%s)", __func__, challenge_id);
 
-    endpoint += challengeId;
+    endpoint += challenge_id;
     endpoint += "/decline";
     payload  += reason ? reason : "generic";
 
     return api_post(endpoint.c_str(), payload, _rsp, true);
 }
 
-bool cancel_challenge(const char *challengeId)
+bool create_challenge(const challenge_st *ps_challenge, const char *fen)
 {
-    LOGD("%s(%s)", __func__, challengeId);
+    String endpoint = "/challenge/";
+    String payload  = "";
+
+    endpoint += ps_challenge->ac_user;
+
+    if (0 == strcmp(ps_challenge->ac_user, "ai")) {
+        payload += "level=1";
+    } else {
+        payload += ps_challenge->b_rated ? "&rated=true" : "&rated=false";
+        payload += "&keepAliveStream=false";
+        payload += "&rules=noRematch,noClaimWin,noEarlyDraw";
+    }
+    payload += "&clock.limit=";
+    payload += ps_challenge->u16_clock_limit;
+    payload += "&clock.increment=";
+    payload += ps_challenge->u8_clock_increment;
+    payload += ps_challenge->b_color ? "&color=white" : "&color=black";
+    payload += "&variant=standard";
+    payload += "&fen=";
+    payload += fen;
+
+    //payload.replace(" ", "%20");
+    LOGD("play as %s vs %s:\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, payload.c_str());
+
+    return api_post(endpoint.c_str(), payload, _rsp, true);
+
+}
+
+bool cancel_challenge(const char *challenge_id)
+{
+    LOGD("%s(%s)", __func__, challenge_id);
     // to do
     delay(1000);
     return false;

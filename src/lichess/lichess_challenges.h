@@ -52,9 +52,12 @@ typedef struct
 
 // return challenge_type_st or negative for error
 int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge /*output*/);
-bool accept_challenge(const char *challengeId);
-bool decline_challenge(const char *challengeId, const char *reason=NULL);
-bool cancel_challenge(const char *challengeId);
+
+bool accept_challenge(const char *challenge_id);
+bool decline_challenge(const char *challenge_id, const char *reason=NULL);
+
+bool create_challenge(const challenge_st *ps_challenge, const char *fen);
+bool cancel_challenge(const char *challenge_id);
 
 } // namespace lichess
 

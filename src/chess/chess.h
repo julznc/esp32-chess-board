@@ -124,7 +124,8 @@ const char *color_to_string(uint8_t b_color);
 const char *piece_to_string(uint8_t u7_type);
 
 // api's
-const stats_st *get_position(String &fen /*current position*/, String &move /*last move*/);
+const stats_st *get_position(String &fen /*current position*/, String &move /*last uci move*/);
+bool get_position(String &fen);
 bool get_last_move(String &move /*uci*/);
 bool get_pgn(String &pgn);
 bool queue_move(const String &move);
