@@ -8,7 +8,7 @@
 namespace chess
 {
 
-static game_st          st_game;
+static game_st          s_game;
 SemaphoreHandle_t       mtx = NULL;
 static move_st          last_move;
 static move_st          pending_move;
@@ -58,7 +58,7 @@ static inline uint8_t count_pieces(const uint8_t u8_piece, uint8_t *pau8_sqs=NUL
         for (uint8_t file = 0; file < 8; file++)
         {
             uint8_t sq = ((7-rank) << 4) + file;
-            if (u8_piece == st_game.board[sq])
+            if (u8_piece == s_game.board[sq])
             {
                 if ((u8_count < u8_max) && (NULL != pau8_sqs)) {
                     pau8_sqs[u8_count] = sq;
@@ -83,8 +83,8 @@ static inline bool validate_king(void)
     }
     else
     {
-        uint8_t sqw = st_game.stats.kings[WHITE];
-        uint8_t sqb = st_game.stats.kings[BLACK];
+        uint8_t sqw = s_game.stats.kings[WHITE];
+        uint8_t sqb = s_game.stats.kings[BLACK];
         uint8_t rw = RANK(sqw), fw = FILE(sqw);
         uint8_t rb = RANK(sqb), fb = FILE(sqb);
         uint8_t rdiff = rw > rb ? (rw - rb) : (rb - rw);
@@ -139,7 +139,7 @@ static inline bool validate_position(void)
     }
     else
     {
-        LOGD("white K%c%u black K%c%u", ALGEBRAIC(st_game.stats.kings[WHITE]), ALGEBRAIC(st_game.stats.kings[BLACK]));
+        LOGD("white K%c%u black K%c%u", ALGEBRAIC(s_game.stats.kings[WHITE]), ALGEBRAIC(s_game.stats.kings[BLACK]));
         b_valid = true;
     }
 
@@ -150,7 +150,7 @@ static inline bool load_position(const uint8_t *raw, bool initial)
 {
     if (initial)
     {
-        memset(&st_game, 0, sizeof(st_game));
+        memset(&s_game, 0, sizeof(s_game));
     }
 
     for (uint8_t rank = 0; rank < 8; rank++)
@@ -160,13 +160,13 @@ static inline bool load_position(const uint8_t *raw, bool initial)
             // note: inverted rank order
             uint8_t sq = ((7-rank) << 4) + file;
             uint8_t piece = *raw++;
-            st_game.board[sq] = piece;
+            s_game.board[sq] = piece;
             if (KING == PIECE_TYPE(piece)) {
                 // one king only per color
-                // assert(0 == st_game.stats.kings[PIECE_COLOR(piece)]);
-                st_game.stats.kings[PIECE_COLOR(piece)] = sq;
+                // assert(0 == s_game.stats.kings[PIECE_COLOR(piece)]);
+                s_game.stats.kings[PIECE_COLOR(piece)] = sq;
             }
-            //printf("%3d=%02x ", sq, st_game.board[sq]);
+            //printf("%3d=%02x ", sq, s_game.board[sq]);
         }
         //printf("\r\n");
     }
@@ -174,46 +174,46 @@ static inline bool load_position(const uint8_t *raw, bool initial)
     if (initial)
     {
         // default to white's turn
-        st_game.stats.turn = WHITE;
+        s_game.stats.turn = WHITE;
 
     #if 1 // castling rights (not accurate)
-        if (MAKE_PIECE(WHITE, KING) == st_game.board[e1])
+        if (MAKE_PIECE(WHITE, KING) == s_game.board[e1])
         {
-            if (MAKE_PIECE(WHITE, ROOK) == st_game.board[a1]) {
-                st_game.stats.castling[WHITE] |= BIT_QSIDE_CASTLE;
+            if (MAKE_PIECE(WHITE, ROOK) == s_game.board[a1]) {
+                s_game.stats.castling[WHITE] |= BIT_QSIDE_CASTLE;
             }
-            if (MAKE_PIECE(WHITE, ROOK) == st_game.board[h1]) {
-                st_game.stats.castling[WHITE] |= BIT_KSIDE_CASTLE;
+            if (MAKE_PIECE(WHITE, ROOK) == s_game.board[h1]) {
+                s_game.stats.castling[WHITE] |= BIT_KSIDE_CASTLE;
             }
         }
 
-        if (MAKE_PIECE(BLACK, KING) == st_game.board[e8])
+        if (MAKE_PIECE(BLACK, KING) == s_game.board[e8])
         {
-            if (MAKE_PIECE(BLACK, ROOK) == st_game.board[a8]) {
-                st_game.stats.castling[BLACK] |= BIT_QSIDE_CASTLE;
+            if (MAKE_PIECE(BLACK, ROOK) == s_game.board[a8]) {
+                s_game.stats.castling[BLACK] |= BIT_QSIDE_CASTLE;
             }
-            if (MAKE_PIECE(BLACK, ROOK) == st_game.board[h8]) {
-                st_game.stats.castling[BLACK] |= BIT_KSIDE_CASTLE;
+            if (MAKE_PIECE(BLACK, ROOK) == s_game.board[h8]) {
+                s_game.stats.castling[BLACK] |= BIT_KSIDE_CASTLE;
             }
         }
-        //LOGD("castling %02x %02x", st_game.stats.castling[WHITE], st_game.stats.castling[BLACK]);
+        //LOGD("castling %02x %02x", s_game.stats.castling[WHITE], s_game.stats.castling[BLACK]);
     #endif
 
     #if 0 // to do
-        st_game.stats.ep_square = 0;
+        s_game.stats.ep_square = 0;
     #endif
 
     #if 0 // to do
-        st_game.stats.half_moves = 0;
+        s_game.stats.half_moves = 0;
     #endif
 
     #if 1 // to do
-        st_game.stats.move_number = 1;
+        s_game.stats.move_number = 1;
     #endif
 
     }
 
-    LOGD("fen: %s", generate_fen(&st_game));
+    LOGD("fen: %s", generate_fen(&s_game));
 
     return validate_position();
 }
@@ -228,6 +228,8 @@ void init(void)
         pu8_pieces = brd::pu8_pieces();
     }
 
+    init_game(&s_game);
+
     memset(&last_move, 0, sizeof(move_st));
     memset(&pending_move, 0, sizeof(move_st));
 
@@ -235,22 +237,27 @@ void init(void)
     strncpy(s_move_stack[0].san_white, "...", 15);
     strncpy(s_move_stack[0].san_black, "...", 15);
 
+    b_pending_led    = false;
+    b_skip_start_fen = false;
+    b_valid_posision = false;
+
 }
 
 static inline void show_turn(void)
 {
     static bool state = false;
-    if (WHITE == st_game.stats.turn) {
-        ui::leds::setColor(d5, state ? ui::leds::LED_GREEN : ui::leds::LED_OFF);
+
+    // blink king's square
+    ui::leds::setColor(s_game.stats.kings[s_game.stats.turn], state ? ui::leds::LED_ORANGE : ui::leds::LED_OFF);
+    ui::leds::setColor(s_game.stats.kings[SWAP_COLOR(s_game.stats.turn)], ui::leds::LED_OFF);
+    if (WHITE == s_game.stats.turn) { // blink e4 square
         ui::leds::setColor(e4, state ? ui::leds::LED_OFF : ui::leds::LED_GREEN);
-        ui::leds::setColor(d4, ui::leds::LED_OFF);
         ui::leds::setColor(e5, ui::leds::LED_OFF);
-    } else {
-        ui::leds::setColor(d4, state ? ui::leds::LED_GREEN : ui::leds::LED_OFF);
+    } else { // blink e5 square
         ui::leds::setColor(e5, state ? ui::leds::LED_OFF : ui::leds::LED_GREEN);
-        ui::leds::setColor(d5, ui::leds::LED_OFF);
         ui::leds::setColor(e4, ui::leds::LED_OFF);
     }
+
     state = !state; // blink
 }
 
@@ -267,9 +274,9 @@ static inline void show_diff(const uint8_t *prev)
 static inline void show_checked(void)
 {
     static bool state = false;
-    if (IN_CHECK(&st_game))
+    if (IN_CHECK(&s_game))
     {
-        uint8_t idx = SQUARE_TO_IDX(st_game.stats.kings[st_game.stats.turn]);
+        uint8_t idx = SQUARE_TO_IDX(s_game.stats.kings[s_game.stats.turn]);
         ui::leds::setColor(idx>>3, idx&7, state ? ui::leds::LED_RED : ui::leds::LED_OFF);
         state = !state; // blink
     }
@@ -304,7 +311,7 @@ static inline void show_move(void)
 
 static inline void display_stats(const char *last_san)
 {
-    const stats_st *stats = &st_game.stats;
+    const stats_st *stats = &s_game.stats;
     char tmp_fen[24];
     char *fen = tmp_fen;
 
@@ -356,7 +363,7 @@ static inline void do_move(move_st *list, move_st *move)
 
     lock();
 
-    make_move(&st_game, move);
+    make_move(&s_game, move);
     move_to_san(list, move, san_buf, sizeof(san_buf) - 1);
 
     memcpy(au8_prev_pieces, pu8_pieces, sizeof(au8_prev_pieces));
@@ -366,32 +373,32 @@ static inline void do_move(move_st *list, move_st *move)
     if (move->flags & BIT_PROMOTION) {
         // set actual promoted piece
         uint8_t promoted = pu8_pieces[SQUARE_TO_IDX(move->to)];
-        //LOGD("change %02x to %02x", st_game.board[move->to], promoted);
+        //LOGD("change %02x to %02x", s_game.board[move->to], promoted);
         char ch = PIECE_TYPE(promoted);
-        st_game.board[move->to] = promoted;
+        s_game.board[move->to] = promoted;
         snprintf(&san_buf[strlen(san_buf)], sizeof(san_buf) - 4, "=%c", toupper(ch));
     }
 
     unlock();
 
-    move_st *next_moves = generate_moves(&st_game);
+    move_st *next_moves = generate_moves(&s_game);
     if (next_moves) {
-        if (IN_CHECK(&st_game)) {
+        if (IN_CHECK(&s_game)) {
             strcat(san_buf, "+"); // in-check only
         }
         clear_moves(&next_moves);
-    } else if (IN_CHECK(&st_game)) {
+    } else if (IN_CHECK(&s_game)) {
         strcat(san_buf, "#"); // checkmate!
         LOGI("matyas!!!");
     } else {
         strcat(san_buf, "sm"); // stalemate
     }
 
-    LOGD("%-5s : %s", san_buf, generate_fen(&st_game));
-    if (BLACK == st_game.stats.turn) {
-        strncpy(s_move_stack[st_game.stats.move_number - 1].san_white, san_buf, 15);
+    LOGD("%-5s : %s", san_buf, generate_fen(&s_game));
+    if (BLACK == s_game.stats.turn) {
+        strncpy(s_move_stack[s_game.stats.move_number - 1].san_white, san_buf, 15);
     } else {
-        strncpy(s_move_stack[st_game.stats.move_number - 2].san_black, san_buf, 15);
+        strncpy(s_move_stack[s_game.stats.move_number - 2].san_black, san_buf, 15);
     }
     //DISPLAY_CLEAR();
     //DISPLAY_TEXT(4, 48, 1, "%s", san_buf);
@@ -424,15 +431,15 @@ void loop(void)
 
     ui::leds::clear();
 
-    if (!st_game.history) // if no moves yet
+    if (!s_game.history) // if no moves yet
     {
         // if upper-left button was pressed ...
         if ((millis() - u32_last_checked > 1000UL) && (1 == ui::btn::pb1.getCount()))
         {
             b_skip_start_fen = true; // allow custom position
             if (b_valid_posision) {
-                st_game.stats.turn = SWAP_COLOR(st_game.stats.turn); // toggle turn
-                LOGD("new fen: %s", generate_fen(&st_game));
+                s_game.stats.turn = SWAP_COLOR(s_game.stats.turn); // toggle turn
+                LOGD("new fen: %s", generate_fen(&s_game));
             }
             u32_last_checked = millis();
         }
@@ -467,15 +474,15 @@ void loop(void)
     else
     {
         move_st move;
-        move_st *moves_list = generate_moves(&st_game);
+        move_st *moves_list = generate_moves(&s_game);
 
                 // exact move
-        if (find_move(&st_game, moves_list, pu8_pieces, &move))
+        if (find_move(&s_game, moves_list, pu8_pieces, &move))
         {
             do_move(moves_list, &move);
         }
         // lift a piece ?
-        else if (0 != (u8_squares_count = hint_moves(&st_game, moves_list, pu8_pieces, au8_allowed_squares, sizeof(au8_allowed_squares))))
+        else if (0 != (u8_squares_count = hint_moves(&s_game, moves_list, pu8_pieces, au8_allowed_squares, sizeof(au8_allowed_squares))))
         {
           #if 0
             uint8_t piece = au8_prev_pieces[SQUARE_TO_IDX(au8_allowed_squares[0])];
@@ -493,12 +500,12 @@ void loop(void)
         {
             // is continuation ?
             lock();
-            if (undo_move(&st_game, &move))
+            if (undo_move(&s_game, &move))
             {
                 unlock();
                 clear_moves(&moves_list);
-                moves_list = generate_moves(&st_game);
-                if (find_move(&st_game, moves_list, pu8_pieces, &move))
+                moves_list = generate_moves(&s_game);
+                if (find_move(&s_game, moves_list, pu8_pieces, &move))
                 {
                     do_move(moves_list, &move);
                 }
@@ -508,7 +515,7 @@ void loop(void)
                     show_diff(au8_prev_pieces);
                     ui::leds::update();
                     lock();
-                    make_move(&st_game, &move); // redo last
+                    make_move(&s_game, &move); // redo last
                     unlock();
                 }
             }
@@ -625,11 +632,11 @@ const char *piece_to_string(uint8_t u7_type)
 const stats_st *get_position(String &fen /*current position*/, String &move /*last move*/)
 {
     lock();
-    fen = generate_fen(&st_game);
+    fen = generate_fen(&s_game);
     unlock();
 
     (void)get_last_move(move);
-    return &st_game.stats;
+    return &s_game.stats;
 }
 
 bool get_position(String &fen)
@@ -639,7 +646,7 @@ bool get_position(String &fen)
     b_status = b_valid_posision;
     if (b_status)
     {
-        fen = generate_fen(&st_game);
+        fen = generate_fen(&s_game);
     }
     unlock();
     return b_status;
@@ -650,7 +657,7 @@ bool get_last_move(String &move)
     bool b_status = false;
 
     lock();
-    if (!st_game.history)
+    if (!s_game.history)
     {
         move = "";
     }
@@ -661,7 +668,7 @@ bool get_last_move(String &move)
         move += (char)('a' + FILE(last_move.to));
         move += (char)('0' + 8 - RANK(last_move.to));
         if (last_move.flags & BIT_PROMOTION) {
-            move += (char)PIECE_TYPE(st_game.board[last_move.to]);
+            move += (char)PIECE_TYPE(s_game.board[last_move.to]);
         }
         b_status = true;
     }
@@ -672,11 +679,11 @@ bool get_last_move(String &move)
 
 bool get_pgn(String &pgn)
 {
-    uint16_t total_moves = st_game.stats.move_number;
+    uint16_t total_moves = s_game.stats.move_number;
 
     lock();
 
-    if (WHITE == st_game.stats.turn) {
+    if (WHITE == s_game.stats.turn) {
         total_moves--;
     }
 
@@ -715,7 +722,7 @@ bool queue_move(const String &move)
             {
                 LOGD("queue %c%u %c%u", ALGEBRAIC(from_sq), ALGEBRAIC(to_sq));
                 lock();
-                pending_move.piece = st_game.board[from_sq];
+                pending_move.piece = s_game.board[from_sq];
                 pending_move.from = from_sq;
                 pending_move.to   = to_sq;
                 unlock();

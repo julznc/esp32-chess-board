@@ -464,6 +464,14 @@ static void taskClient(void *)
 
                 display_clock(s_current_game.b_turn, true);
             }
+            else if (s_current_game.e_state > GAME_STATE_STARTED)
+            {
+                // finished
+                fen = "";
+                prev_fen = "";
+                last_move = "";
+                queue_move = "";
+            }
             e_state = CLIENT_STATE_IDLE;
             break;
 

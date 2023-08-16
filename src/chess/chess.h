@@ -112,6 +112,7 @@ bool attacked(const uint8_t *board, uint8_t color, uint8_t square);
 #define KING_ATTACKED(game, color)  attacked((game)->board, SWAP_COLOR((color)),  (game)->stats.kings[(color)])
 #define IN_CHECK(game)              KING_ATTACKED((game), (game)->stats.turn)
 
+void init_game(game_st *p_game);
 void make_move(game_st *p_game, const move_st *move);
 bool undo_move(game_st *p_game, move_st *last=nullptr);
 move_st *generate_moves(game_st *p_game);

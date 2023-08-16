@@ -8,7 +8,7 @@
 
 // app firmware info
 #define K_APP_NAME                  "Electronic Chess Board"
-#define K_APP_VERSION               "01.04.15"
+#define K_APP_VERSION               "01.04.16"
 
 
 // for esp32-s2: RX1=18, TX1=17
@@ -48,7 +48,7 @@
 
 
 // set "CORE_DEBUG_LEVEL" build flag, and call "<hwserial>.setDebugOutput(true)"
-#define LOGD                        log_d
+#define LOGD                        log_i
 #define LOGI(fmt, ...)              log_i("\x1B[32m" fmt "\x1B[0m", ## __VA_ARGS__)
 #define LOGW(fmt, ...)              log_w("\x1B[33m" fmt "\x1B[0m", ## __VA_ARGS__)
 #define LOGE(fmt, ...)              log_e("\x1B[31m" fmt "\x1B[0m", ## __VA_ARGS__)

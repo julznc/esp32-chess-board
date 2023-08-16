@@ -114,6 +114,21 @@ static inline void push(game_st *p_game, const move_st *move)
     }
 }
 
+void init_game(game_st *p_game)
+{
+    record_st *history = p_game->history;
+    if (history)
+    {
+        record_st *elt, *tmp;
+        LL_FOREACH_SAFE(history, elt, tmp) {
+            //LOGD("del %c from %d to %d", elt->move.piece, elt->move.from, elt->move.to);
+            LL_DELETE(history, elt);
+            free(elt);
+        }
+    }
+    memset(p_game, 0, sizeof(game_st));
+}
+
 void make_move(game_st *p_game, const move_st *move)
 {
     uint8_t us = PIECE_COLOR(move->piece);
