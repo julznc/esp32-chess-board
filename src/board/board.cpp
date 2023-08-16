@@ -331,9 +331,10 @@ void loop(void)
         break;
 
     case BRD_STATE_SCAN:
-        if (ui::btn::pb1.pressedDuration() >= 3000UL)
+        if (MAIN_BTN.pressedDuration() >= 3000UL)
         {
             LOGD("restart");
+            MAIN_BTN.resetCount();
             e_state = BRD_STATE_INIT;
         }
         else

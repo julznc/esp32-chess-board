@@ -137,7 +137,8 @@ bool create_challenge(const challenge_st *ps_challenge, const char *fen)
     endpoint += ps_challenge->ac_user;
 
     if (0 == strcmp(ps_challenge->ac_user, "ai")) {
-        payload += "level=1";
+        payload += "level=";
+        payload += ps_challenge->u8_level;
     } else {
         payload += ps_challenge->b_rated ? "&rated=true" : "&rated=false";
         payload += "&keepAliveStream=false";
@@ -156,7 +157,6 @@ bool create_challenge(const challenge_st *ps_challenge, const char *fen)
     LOGD("play as %s vs %s:\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, payload.c_str());
 
     return api_post(endpoint.c_str(), payload, _rsp, true);
-
 }
 
 bool cancel_challenge(const char *challenge_id)

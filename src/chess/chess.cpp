@@ -434,8 +434,9 @@ void loop(void)
     if (!s_game.history) // if no moves yet
     {
         // if upper-left button was pressed ...
-        if ((millis() - u32_last_checked > 1000UL) && (1 == ui::btn::pb1.getCount()))
+        if ((millis() - u32_last_checked > 1000UL) && (MAIN_BTN.shortPressed()))
         {
+            MAIN_BTN.resetCount();
             b_skip_start_fen = true; // allow custom position
             if (b_valid_posision) {
                 s_game.stats.turn = SWAP_COLOR(s_game.stats.turn); // toggle turn

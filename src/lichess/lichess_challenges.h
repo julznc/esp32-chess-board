@@ -45,6 +45,7 @@ typedef struct
     game_speed_et   e_speed;
     uint16_t        u16_clock_limit;    // seconds
     uint8_t         u8_clock_increment; // seconds
+    uint8_t         u8_level;           // for AI strength only [1 .. 8]
     bool            b_rated;
     bool            b_color;            // challenger's color (true = white)
 } challenge_st;

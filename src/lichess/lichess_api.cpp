@@ -322,8 +322,8 @@ static int poll_game_state()
                 if (sp > 0) {
                     str_last_move = str_current_moves.substring(sp + 1);
                 }
-                LOGI("%s (%d) %s", type, result, str_last_move.c_str());
-                LOGD("%s", str_current_moves.c_str());
+                LOGD("%s (%d) %s", type, result, str_last_move.c_str());
+                //LOGD("%s", str_current_moves.c_str());
                 display_clock(s_current_game.b_turn, true);
             }
         }
@@ -335,13 +335,21 @@ static int poll_game_state()
 
 static void taskClient(void *)
 {
-    String fen, prev_fen, last_move, queue_move;
-    const chess::stats_st *fen_stats;
-
+    String          fen, prev_fen;
+    String          last_move, queue_move;
+    challenge_st    s_challenge; // outgoing challenge
+    const chess::stats_st *fen_stats = NULL;
+    bool            b_level_adjusted = false;
 
     WDT_WATCH(NULL);
 
     delay(2500UL);
+
+    strncpy(s_challenge.ac_user, "ai", sizeof(s_challenge.ac_user) - 1);
+    s_challenge.u8_level            = 1;
+    s_challenge.b_rated             = false;
+    s_challenge.u16_clock_limit     = 65 * 60;
+    s_challenge.u8_clock_increment  = 30;
 
     for (;;)
     {
@@ -478,39 +486,56 @@ static void taskClient(void *)
         case CLIENT_STATE_IDLE:
             if (GAME_STATE_STARTED == s_current_game.e_state)
             {
-                if (ui::btn::pb3.getCount()) {
+                if (RIGHT_BTN.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     game_resign(s_current_game.ac_id);
-                } else if (ui::btn::pb2.getCount()) {
+                } else if (LEFT_BTN.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     game_abort(s_current_game.ac_id);
                 }
             }
             else if (s_incoming_challenge.ac_id[0])
             {
-                if (ui::btn::pb3.getCount()) {
+                if (RIGHT_BTN.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     decline_challenge(s_incoming_challenge.ac_id);
-                } else if (ui::btn::pb2.getCount()) {
+                } else if (LEFT_BTN.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     accept_challenge(s_incoming_challenge.ac_id);
                 }
             }
             else if (!fen.isEmpty())
             {
-                challenge_st s_out; // outgoing challenge
-                strncpy(s_out.ac_user, "ai", sizeof(s_out.ac_user) - 1);
-                s_out.b_rated = false;
-                s_out.u16_clock_limit = 65 * 60;
-                s_out.u8_clock_increment = 30;
-                if (ui::btn::pb3.getCount()) {
+                //
+                if (RIGHT_BTN.pressedDuration() >= 1500UL) {
+                    RIGHT_BTN.resetCount();
+                    if (s_challenge.u8_level < 8) {
+                        s_challenge.u8_level++;
+                    }
+                    SHOW_OPPONENT("Stockfish level %u", s_challenge.u8_level);
+                    b_level_adjusted = true;
+                }
+                else if (LEFT_BTN.pressedDuration() >= 1500UL) {
+                    LEFT_BTN.resetCount();
+                    if (s_challenge.u8_level > 1) {
+                        s_challenge.u8_level--;
+                    }
+                    SHOW_OPPONENT("Stockfish level %u", s_challenge.u8_level);
+                    b_level_adjusted = true;
+                }
+                else if (b_level_adjusted) {
+                    delay(1500UL);
+                    b_level_adjusted = false;
+                }
+                else if (RIGHT_BTN.shortPressed()) {
                     CLEAR_BOTTOM_MENU();
-                    s_out.b_color = true;
-                    create_challenge(&s_out, fen.c_str());
-                } else if (ui::btn::pb2.getCount()) {
+                    s_challenge.b_color = true;
+                    create_challenge(&s_challenge, fen.c_str());
+                }
+                else if (LEFT_BTN.shortPressed()) {
                     CLEAR_BOTTOM_MENU();
-                    s_out.b_color = false;
-                    create_challenge(&s_out, fen.c_str());
+                    s_challenge.b_color = false;
+                    create_challenge(&s_challenge, fen.c_str());
                 }
             }
             e_state = CLIENT_STATE_CHECK_EVENTS;

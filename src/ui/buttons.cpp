@@ -30,7 +30,7 @@ void PushButton::loop()
     }
 
     if ((currentTime - lastDebounceTime) > 10 /*debounceTime*/) {
-        previousSteadyState = lastSteadyState;
+        previousSteadyState.store(lastSteadyState.load());
         lastSteadyState = currentState;
     }
 
@@ -68,6 +68,14 @@ uint32_t PushButton::pressedDuration()
 uint32_t PushButton::getCount()
 {
     return pressedCount;
+}
+
+void PushButton::resetCount()
+{
+    pressedCount = 0;
+    if (lastSteadyState == LOW) {
+        lastPressedTime = millis();
+    }
 }
 
 
