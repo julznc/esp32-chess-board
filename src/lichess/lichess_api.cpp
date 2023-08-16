@@ -10,10 +10,16 @@
 
 #define SHOW_STATUS(msg, ...)       DISPLAY_CLEAR_ROW(10, 8); \
                                     DISPLAY_TEXT1(0, 10, msg, ## __VA_ARGS__)
+
+#define SHOW_OPPONENT(name, ...)    DISPLAY_CLEAR_ROW(32, 8); \
+                                    DISPLAY_TEXT1(0, 32, name, ## __VA_ARGS__)
+
 #define SET_BOTTOM_MSG(msg, ...)    DISPLAY_CLEAR_ROW(45, 9); \
                                     DISPLAY_TEXT1(0, 45, msg, ## __VA_ARGS__)
+
 #define SET_BOTTOM_MENU(msg, ...)   DISPLAY_CLEAR_ROW(54, 9); \
                                     DISPLAY_TEXT1(0, 54, msg, ## __VA_ARGS__)
+
 #define CLEAR_BOTTOM_MENU()         DISPLAY_CLEAR_ROW(45, 18);
 
 namespace lichess
@@ -22,6 +28,8 @@ namespace lichess
 static ApiClient        main_client;    // main connection (non-stream)
 static ApiClient        stream_client;  // both events-stream & board-state-stream connections
 static challenge_st     s_incoming_challenge;
+static String           str_current_moves;
+static String           str_last_move;
 static game_st          s_current_game;
 
 static char             ac_username[32];
@@ -196,6 +204,8 @@ static int poll_events()
                     DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
                     if ((GAME_STATE_STARTED == result) && s_current_game.ac_id[0])
                     {
+                        str_current_moves = ""; // clear starting moves
+                        SHOW_OPPONENT("%.17s %c", s_current_game.ac_opponent, s_current_game.b_color ? 'B' : 'W');
                         SET_BOTTOM_MENU("<-Abort      Resign->");
                         // ignore any incoming challenge
                         memset(&s_incoming_challenge, 0, sizeof(s_incoming_challenge));
@@ -238,6 +248,37 @@ static int poll_events()
     return result;
 }
 
+static inline void display_clock(bool b_turn, bool b_show)
+{
+    static uint32_t ms_last_update = millis();
+    uint32_t ms_now = millis();
+    uint32_t ms_diff = ms_now - ms_last_update;
+
+    if (!b_show)
+    {
+        DISPLAY_CLEAR_ROW(45, 9);
+    }
+    else
+    {
+        uint32_t wsecs = s_current_game.u32_wtime / 1000UL;
+        uint32_t bsecs = s_current_game.u32_btime / 1000UL;
+        uint32_t wmins = wsecs / 60;
+        uint32_t bmins = bsecs / 60;
+
+        wsecs = wsecs % 60;
+        bsecs = bsecs % 60;
+        //" 000:00       000:00 "
+        DISPLAY_TEXT1(0, 45, " %3u:%02u       %3u:%02u ", bmins, bsecs, wmins, wsecs);
+    }
+
+    if (b_turn) {
+        s_current_game.u32_wtime -= ms_diff;
+    } else {
+        s_current_game.u32_btime -= ms_diff;
+    }
+    ms_last_update = ms_now;
+}
+
 static int poll_game_state()
 {
     String  payload;
@@ -270,12 +311,20 @@ static int poll_game_state()
             else if (!response.containsKey("type"))
             {
                 LOGW("unknown game state");
+                display_clock(false, false);
             }
             else
             {
                 const char *type = response["type"].as<const char*>();
-                result = parse_game_state(response, &s_current_game);
-                LOGD("%s: %d", type, result);
+                result = parse_game_state(response, &s_current_game, str_current_moves);
+                str_last_move = str_current_moves;
+                int sp = str_current_moves.length() ? str_current_moves.lastIndexOf(' ') : 0;
+                if (sp > 0) {
+                    str_last_move = str_current_moves.substring(sp + 1);
+                }
+                LOGI("%s (%d) %s", type, result, str_last_move.c_str());
+                LOGD("%s", str_current_moves.c_str());
+                display_clock(s_current_game.b_turn, true);
             }
         }
 
@@ -286,7 +335,10 @@ static int poll_game_state()
 
 static void taskClient(void *)
 {
-    String fen = "";
+    String fen, prev_fen, last_move, queue_move;
+    const chess::stats_st *fen_stats;
+
+
     WDT_WATCH(NULL);
 
     delay(2500UL);
@@ -387,11 +439,36 @@ static void taskClient(void *)
                     SET_BOTTOM_MENU("<-Black       White->");
                 }
             }
+            else if (GAME_STATE_STARTED == s_current_game.e_state) // if has on-going game
+            {
+                fen_stats = chess::get_position(fen, last_move);
+
+                if (prev_fen != fen)
+                {
+                    if (!last_move.isEmpty() && (last_move != queue_move) && (fen_stats->turn != s_current_game.b_color))
+                    {
+                        if (game_move(s_current_game.ac_id, last_move.c_str()))
+                        {
+                            LOGD("send move %s ok", last_move.c_str());
+                            prev_fen = fen;
+                        }
+                    }
+                }
+
+                if (!str_last_move.isEmpty() && (str_last_move != queue_move) && (fen_stats->turn != s_current_game.b_color))
+                {
+                    //LOGD("need queue %s? turn %d - %d", str_last_move.c_str(), fen_stats->turn, s_current_game.b_color);
+                    queue_move = str_last_move;
+                    chess::queue_move(queue_move);
+                }
+
+                display_clock(s_current_game.b_turn, true);
+            }
             e_state = CLIENT_STATE_IDLE;
             break;
 
         case CLIENT_STATE_IDLE:
-            if (s_current_game.ac_id[0])
+            if (GAME_STATE_STARTED == s_current_game.e_state)
             {
                 if (ui::btn::pb3.getCount()) {
                     CLEAR_BOTTOM_MENU();
@@ -416,8 +493,8 @@ static void taskClient(void *)
                 challenge_st s_out; // outgoing challenge
                 strncpy(s_out.ac_user, "ai", sizeof(s_out.ac_user) - 1);
                 s_out.b_rated = false;
-                s_out.u16_clock_limit = 15 * 60;
-                s_out.u8_clock_increment = 10;
+                s_out.u16_clock_limit = 65 * 60;
+                s_out.u8_clock_increment = 30;
                 if (ui::btn::pb3.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     s_out.b_color = true;
@@ -572,7 +649,7 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
             }
             else
             {
-                LOGW("GET %s failed: %s", endpoint, main_client.errorToString(httpCode).c_str());
+                LOGW("POST %s failed: %s", endpoint, main_client.errorToString(httpCode).c_str());
             }
         }
         else

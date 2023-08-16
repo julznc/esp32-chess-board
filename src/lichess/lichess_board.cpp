@@ -82,11 +82,20 @@ int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/)
             }
             else
             {
+                JsonObject  opponent    = obj["opponent"].as<JsonObject>();
+                const char *opp_name    = opponent["username"].as<const char*>();
+                const char *color       = obj["color"].as<const char*>();
+                const char *lastmove    = obj["lastMove"].as<const char*>();
                 const char *status_name = status["name"].as<const char*>();
-                ps_game->e_state        = (game_state_et)status["id"].as<int>();
-                strncpy(ps_game->ac_id, id, sizeof(ps_game->ac_id) - 1);
 
+                strncpy(ps_game->ac_id, id, sizeof(ps_game->ac_id) - 1);
+                strncpy(ps_game->ac_opponent, opp_name, sizeof(ps_game->ac_opponent) - 1);
+                strncpy(ps_game->ac_lastmove, lastmove, sizeof(ps_game->ac_lastmove) - 1);
                 LOGI("%s %s", status_name, ps_game->ac_id);
+
+                ps_game->b_color        = color[0] == 'w';
+                ps_game->b_turn         = obj["isMyTurn"];
+                ps_game->e_state        = (game_state_et)status["id"].as<int>();
 
                 return ps_game->e_state;
             }
@@ -96,27 +105,40 @@ int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/)
     return GAME_STATE_UNKNOWN;
 }
 
-int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/)
+static inline void parse_game_state_event(JsonObject &obj, game_st *ps_game, String &moves)
+{
+    String status       = obj["status"].as<const char *>();
+
+    moves               = obj["moves"].as<const char *>();
+    ps_game->u32_wtime  = obj["wtime"].as<uint32_t>();
+    ps_game->u32_btime  = obj["btime"].as<uint32_t>();
+    ps_game->u32_winc   = obj["winc"].as<uint32_t>();
+    ps_game->u32_binc   = obj["binc"].as<uint32_t>();
+
+    //LOGD("(%s) moves: \"%s\"", status.c_str(), moves.c_str());
+
+    ps_game->e_state = get_state(status);
+}
+
+int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/, String &moves)
 {
     if (json.containsKey("type"))
     {
         String type = json["type"].as<const char*>();
-        LOGD("event %s", type.c_str());
+        //LOGD("event %s", type.c_str());
 
         game_stream_state_et e_type = get_stream_state(type);
         if (GAME_STREAM_STATE_FULL == e_type)
         {
-            JsonObject obj    = json["state"].as<JsonObject>();
-            String     status = obj["status"].as<const char*>();
-            LOGI("full: %s", status.c_str());
-            ps_game->e_state = get_state(status);
+            JsonObject obj = json["state"].as<JsonObject>();
+            parse_game_state_event(obj, ps_game, moves);
         }
         else if (GAME_STREAM_STATE_CURRENT == e_type)
         {
-            String status = json["status"].as<const char*>();
-            LOGI("state: %s", status.c_str());
-            ps_game->e_state = get_state(status);
+            JsonObject obj = json.as<JsonObject>();
+            parse_game_state_event(obj, ps_game, moves);
         }
+#if 0 // this should be on "event" stream
         else if (GAME_STREAM_STATE_FINISH == e_type)
         {
             JsonObject game   = json["game"].as<JsonObject>();
@@ -125,6 +147,7 @@ int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/)
             LOGI("finish: %s", status.c_str());
             ps_game->e_state = get_state(status);
         }
+#endif
         else
         {
             LOGW("not yet supported stream state %d", e_type);

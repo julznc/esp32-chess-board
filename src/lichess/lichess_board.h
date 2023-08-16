@@ -37,12 +37,20 @@ typedef enum
 typedef struct
 {
     char            ac_id[16];      // for url
+    char            ac_opponent[32];
+    char            ac_lastmove[8];
     game_state_et   e_state;
+    uint32_t        u32_wtime;
+    uint32_t        u32_btime;
+    uint32_t        u32_winc;
+    uint32_t        u32_binc;
+    bool            b_color;        // us; true = white
+    bool            b_turn;         // isMyTurn
 } game_st;
 
 
 int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/);
-int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/);
+int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/, String &moves);
 
 bool game_move(const char *game_id, const char *move_uci);
 bool game_abort(const char *game_id);

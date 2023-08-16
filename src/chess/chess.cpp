@@ -652,7 +652,7 @@ bool get_last_move(String &move)
     lock();
     if (!st_game.history)
     {
-        move = "0000";
+        move = "";
     }
     else
     {
