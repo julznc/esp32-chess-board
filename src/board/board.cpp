@@ -317,16 +317,16 @@ void loop(void)
     switch (e_state)
     {
     case BRD_STATE_INIT:
+        chess::init();
         if (checkSquares() && checkSquares()) // check 2x
         {
             animate_squares();
             scan(); // initial scan
-            chess::init();
             e_state = BRD_STATE_SCAN;
         }
         else
         {
-            delay(3000);
+            delay(10000);
         }
         break;
 

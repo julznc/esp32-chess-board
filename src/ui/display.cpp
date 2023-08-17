@@ -11,9 +11,11 @@ namespace ui::display
 
 
 Adafruit_SH1106G oled(SCREEN_WIDTH, SCREEN_HEIGHT);
-SemaphoreHandle_t mtx = NULL;
 const GFXfont *font2 = &FreeSans9pt7b;
 //const GFXfont *font2 = &FreeSansBold9pt7b;
+
+static SemaphoreHandle_t mtx = NULL;
+static bool b_display_found  = false;
 
 
 bool init(void)
@@ -28,8 +30,9 @@ bool init(void)
 
     if (!oled.init())
     {
-        LOGE("OLED not found");
-        return false;
+        LOGW("OLED not found");
+        b_display_found = false;
+        delay(5000UL);
     }
     else
     {
@@ -39,9 +42,20 @@ bool init(void)
         oled.splash();
         oled.display();
         LOGD("OLED ok");
+        b_display_found = true;
     }
 
-    return true;
+    return b_display_found;
+}
+
+bool lock()
+{
+    return b_display_found && (pdTRUE == xSemaphoreTake(ui::display::mtx, portMAX_DELAY));
+}
+
+void unlock()
+{
+    xSemaphoreGive(ui::display::mtx);
 }
 
 void showBattLevel(void)
