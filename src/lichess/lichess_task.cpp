@@ -54,7 +54,7 @@ static bool get_account()
 
     memset(ac_username, 0, sizeof(ac_username));
 
-    if (!api_get("/account", response))
+    if (!api_get("/api/account", response))
     {
         SHOW_STATUS("lichess api error");
     }
@@ -87,7 +87,7 @@ static int poll_events()
 
     while (stream_client.connected())
     {
-        payload = stream_client.streamResponse();
+        payload = stream_client.readLine();
         result  = 0;
 
         if (0 == payload.length())
@@ -205,7 +205,7 @@ static int poll_game_state()
 
     while (stream_client.connected())
     {
-        payload = stream_client.streamResponse();
+        payload = stream_client.readLine();
         result  = 0;
 
         if (0 == payload.length())
@@ -287,7 +287,7 @@ static void taskClient(void *)
         case CLIENT_STATE_GET_ACCOUNT:
             if (get_account())
             {
-                if (stream_client.startStream("/stream/event"))
+                if (stream_client.startStream("/api/stream/event"))
                 {
                     LOGI("monitor events ok");
                     e_state = CLIENT_STATE_CHECK_EVENTS;
@@ -318,7 +318,7 @@ static void taskClient(void *)
                     delay(1000);
 
                     // api/board/game/stream/{gameId}
-                    String endpoint = "/board/game/stream/";
+                    String endpoint = "/api/board/game/stream/";
                     endpoint += (const char *)s_current_game.ac_id;
                     bool b_started = stream_client.startStream(endpoint.c_str());
                     LOGI("monitor game '%s' %s", s_current_game.ac_id, b_started ? "ok" : "failed");

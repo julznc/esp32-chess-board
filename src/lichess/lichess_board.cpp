@@ -161,7 +161,7 @@ int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/, Str
 // api/board/game/{gameId}/move/{move}
 bool game_move(const char *game_id, const char *move_uci)
 {
-    String endpoint = "/board/game/";
+    String endpoint = "/api/board/game/";
 
     endpoint += game_id;
     endpoint += "/move/";
@@ -173,7 +173,7 @@ bool game_move(const char *game_id, const char *move_uci)
 // api/board/game/{gameId}/abort
 bool game_abort(const char *game_id)
 {
-    String endpoint = "/board/game/";
+    String endpoint = "/api/board/game/";
 
     endpoint += game_id;
     endpoint += "/abort";
@@ -184,7 +184,7 @@ bool game_abort(const char *game_id)
 // api/board/game/{gameId}/resign
 bool game_resign(const char *game_id)
 {
-    String endpoint = "/board/game/";
+    String endpoint = "/api/board/game/";
 
     endpoint += game_id;
     endpoint += "/resign";
@@ -195,7 +195,7 @@ bool game_resign(const char *game_id)
 // api/board/game/{gameId}/draw/{accept}
 bool handle_draw(const char *game_id, bool b_accept)
 {
-    String endpoint = "/board/game/";
+    String endpoint = "/api/board/game/";
 
     endpoint += game_id;
     endpoint += "/draw/";
@@ -207,7 +207,7 @@ bool handle_draw(const char *game_id, bool b_accept)
 // api/board/game/{gameId}/takeback/{accept}
 bool handle_takeback(const char *game_id, bool b_accept)
 {
-    String endpoint = "/board/game/";
+    String endpoint = "/api/board/game/";
 
     endpoint += game_id;
     endpoint += "/takeback/";

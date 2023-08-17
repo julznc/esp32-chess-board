@@ -107,7 +107,7 @@ int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge)
 
 bool accept_challenge(const char *challenge_id)
 {
-    String endpoint = "/challenge/";
+    String endpoint = "/api/challenge/";
     //LOGD("%s(%s)", __func__, challenge_id);
 
     endpoint += challenge_id;
@@ -118,7 +118,7 @@ bool accept_challenge(const char *challenge_id)
 
 bool decline_challenge(const char *challenge_id, const char *reason)
 {
-    String endpoint = "/challenge/";
+    String endpoint = "/api/challenge/";
     String payload  = "reason=";
     //LOGD("%s(%s)", __func__, challenge_id);
 
@@ -131,7 +131,7 @@ bool decline_challenge(const char *challenge_id, const char *reason)
 
 bool create_challenge(const challenge_st *ps_challenge, const char *fen)
 {
-    String endpoint = "/challenge/";
+    String endpoint = "/api/challenge/";
     String payload  = "";
 
     endpoint += ps_challenge->ac_user;

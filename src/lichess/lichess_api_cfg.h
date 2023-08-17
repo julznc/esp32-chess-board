@@ -2,11 +2,20 @@
 #define __LICHESS_API_CFG_H__
 
 
-#define LICHESS_API_URL_PREFIX      "https://lichess.org/api"
+/**
+ * constants
+ */
+static const char      *LICHESS_API_HOST            = "lichess.org";
+static const char      *LICHESS_API_PROTOCOL        = "https";
+static const uint16_t   LICHESS_API_PORT            = 443; // default port
 
-static const char *LICHESS_API_ACCESS_TOKEN = "lip_WFDx9jsINha7GznSYwbm";
-
-static const char *LICHESS_ORG_PEM = R"rawliteral(-----BEGIN CERTIFICATE-----
+/**
+ * configurable
+ * to do: load from Preferences
+ */
+static const char      *LICHESS_API_ACCESS_TOKEN    = "lip_WFDx9jsINha7GznSYwbm";
+static const char      *LICHESS_ORG_PEM =
+R"rawliteral(-----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
 TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
 cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
