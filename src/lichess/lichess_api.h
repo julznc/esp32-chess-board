@@ -32,9 +32,12 @@ public:
 protected:
     esp_http_client_handle_t    _client;
     esp_http_client_config_t    _config;
+    bool                        _connected;
     char                        _auth[64];
     char                        _rsp_buf[2048];
     size_t                      _rsp_len;
+
+    esp_err_t perform(const char *buffer, int len);
 };
 
 // fix me:

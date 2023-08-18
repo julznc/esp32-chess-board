@@ -413,9 +413,11 @@ static void taskClient(void *)
                 if (RIGHT_BTN.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     decline_challenge(s_incoming_challenge.ac_id);
+                    delay(1500UL);
                 } else if (LEFT_BTN.getCount()) {
                     CLEAR_BOTTOM_MENU();
                     accept_challenge(s_incoming_challenge.ac_id);
+                    delay(1500UL);
                 }
             }
             else if (!fen.isEmpty())

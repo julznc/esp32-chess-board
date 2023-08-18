@@ -28,7 +28,11 @@ APIClient::APIClient()
     _config.transport_type      = HTTP_TRANSPORT_OVER_SSL;
     _config.cert_pem            = LICHESS_ORG_PEM;
     _config.event_handler       = event_handler;
+    _config.timeout_ms          = 60000; // network timeout in ms
     _config.keep_alive_enable   = true;
+    _config.keep_alive_idle     = 180;
+    _config.keep_alive_interval = 180;
+    _config.keep_alive_count    = 3;
     _config.user_data           = this;
 
     _client = esp_http_client_init(&_config);
@@ -38,6 +42,7 @@ APIClient::APIClient()
 
 APIClient::~APIClient()
 {
+    esp_http_client_close(_client);
     esp_http_client_cleanup(_client);
 }
 
@@ -55,6 +60,7 @@ esp_err_t APIClient::event_handler(esp_http_client_event_t *evt)
 
     case HTTP_EVENT_ON_CONNECTED:
         LOGI("HTTP_EVENT_ON_CONNECTED");
+        cli->_connected = true;
         break;
 
     case HTTP_EVENT_HEADERS_SENT:
@@ -62,11 +68,12 @@ esp_err_t APIClient::event_handler(esp_http_client_event_t *evt)
         break;
 
     case HTTP_EVENT_ON_HEADER:
-        LOGD("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+        LOGD("HTTP_EVENT_ON_HEADER: key=%s, value=%s", evt->header_key, evt->header_value);
         break;
 
     case HTTP_EVENT_ON_DATA:
-        LOGD("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        LOGD("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
+#if 0
         if (!esp_http_client_is_chunked_response(evt->client))
         {
             int remaining = sizeof(cli->_rsp_buf) - cli->_rsp_len;
@@ -84,15 +91,16 @@ esp_err_t APIClient::event_handler(esp_http_client_event_t *evt)
                 //LOGD("response (%lu)\r\n%.*s", cli->_rsp_len, cli->_rsp_len, cli->_rsp_buf);
             }
         }
+#endif
         break;
 
     case HTTP_EVENT_ON_FINISH:
         LOGD("HTTP_EVENT_ON_FINISH");
-        //LOGD("response (%lu)\r\n%.*s", cli->_rsp_len, cli->_rsp_len, cli->_rsp_buf);
         break;
 
     case HTTP_EVENT_DISCONNECTED:
         LOGW("HTTP_EVENT_DISCONNECTED");
+        cli->_connected = false;
         break;
     }
 
@@ -128,7 +136,7 @@ int APIClient::GET()
         LOGW("failed set_method(%d) (err=%x)", HTTP_METHOD_GET, err);
         code = -err;
     }
-    else if (ESP_OK != (err = esp_http_client_perform(_client)))
+    else if (ESP_OK != (err = perform(NULL, 0)))
     {
         LOGW("failed get() (err=%x)", err);
         code = -err;
@@ -148,15 +156,19 @@ int APIClient::POST(const char *data, int len)
 
     if (ESP_OK != (err = esp_http_client_set_method(_client, HTTP_METHOD_POST)))
     {
-        LOGW("failed set_method(%d) (err=%x)", HTTP_METHOD_GET, err);
+        LOGW("failed set_method(%d) (err=%x)", HTTP_METHOD_POST, err);
         code = -err;
+    }
+    else if ((len > 0) && (ESP_OK != (err = esp_http_client_set_header(_client, "Content-Type", "application/x-www-form-urlencoded"))))
+    {
+        //
     }
     else if (ESP_OK != (err = esp_http_client_set_post_field(_client, data, len)))
     {
         LOGW("failed set_post_field(%d) (err=%x)", len, err);
         code = -err;
     }
-    else if (ESP_OK != (err = esp_http_client_perform(_client)))
+    else if (ESP_OK != (err = perform(data, len)))
     {
         LOGW("failed post() (err=%x)", err);
         code = -err;
@@ -169,6 +181,56 @@ int APIClient::POST(const char *data, int len)
     return code;
 }
 
+esp_err_t APIClient::perform(const char *buffer, int len)
+{
+    esp_err_t err = ESP_OK;
+
+#if 0
+    esp_http_client_open(_client, 0);
+    err = esp_http_client_perform(_client);
+    if (ESP_OK != err)
+    {
+        if (ESP_ERR_HTTP_FETCH_HEADER == err)
+        {
+            //esp_http_client_close(_client);
+        }
+    }
+#else
+    if (ESP_OK != (err = esp_http_client_open(_client, len)))
+    //if ((!_connected) && (ESP_OK != (err = esp_http_client_open(_client, len))))
+    {
+        LOGW("failed open(%d) (err=%x)", len, err);
+    }
+    else if ((NULL != buffer) && (0 != len) && (len != esp_http_client_write(_client, buffer, len)))
+    {
+        LOGW("failed write(%d)", len);
+        err = ESP_FAIL;
+    }
+    else if ((len = esp_http_client_fetch_headers(_client)) < 0)
+    {
+        err = len;
+        LOGW("failed fetch_headers() (err=%x)", err);
+        esp_http_client_close(_client);
+    }
+    else
+    {
+        if (len > sizeof(_rsp_buf)) {
+            LOGW("need more %d bytes", len - sizeof(_rsp_buf));
+            len = sizeof(_rsp_buf);
+        }
+        //len = esp_http_client_read(_client, _rsp_buf, len);
+        len = esp_http_client_read_response(_client, _rsp_buf, len);
+        if (len > 0)
+        {
+            LOGD("esp_http_client_read()=%d\r\n%s", len, _rsp_buf);
+            _rsp_len = len;
+            err = ESP_OK;
+        }
+    }
+#endif
+
+    return err;
+}
 
 
 ApiClient::SecClient::SecClient() : WiFiClientSecure()
@@ -453,18 +515,16 @@ String ApiClient::readLine(void)
  */
 bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
 {
-    bool b_status = false;
-#if 1
-    int  status = 0;
+    int     status   = 0;
+    bool    b_status = false;
+
+    LOGD("%s(%s)", __func__, endpoint);
+
     if (!main_client.begin(endpoint))
     {
         LOGW("begin(%s) failed", endpoint);
     }
-    else if ((status = main_client.GET()) < HttpStatus_Ok)
-    {
-        //
-    }
-    else
+    else if ((status = main_client.GET()) >= HttpStatus_Ok)
     {
         if (b_debug) {
             LOGD("status=%d response (%lu):\r\n%s", status, main_client.get_content_length(), main_client.get_content());
@@ -481,61 +541,41 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
             b_status = true;
         }
     }
-#else
-    bool b_stop   = false;
 
-    if (!main_client.begin(endpoint))
-    {
-        LOGW("begin(%s) failed", endpoint);
-    }
-    else
-    {
-        int httpCode = main_client.sendRequest("GET");
-        if (httpCode > 0)
-        {
-            String payload = main_client.readLine();
-            if (b_debug) {
-                LOGD("payload (%u):\r\n%s", payload.length(), payload.c_str());
-            }
-
-            if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))
-            {
-                if (payload.length() > 0)
-                {
-                    json.clear();
-                    DeserializationError error = deserializeJson(json, payload);
-                    if (error)
-                    {
-                        LOGW("deserializeJson() failed: %s", error.f_str());
-                    }
-                    else
-                    {
-                        b_status = true;
-                    }
-                }
-            }
-            else
-            {
-                LOGW("GET %s failed: %s", endpoint, main_client.errorToString(httpCode).c_str());
-            }
-        }
-        else
-        {
-            LOGW("error code %d", httpCode);
-            b_stop = true;
-            main_client.end(true);
-        }
-    }
-
-    //main_client.end(b_stop);
-#endif
     return b_status;
 }
 
 bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, bool b_debug)
 {
 #if 1
-    return false;
+    int     status   = 0;
+    bool    b_status = false;
+
+    LOGD("%s(%s)", __func__, endpoint);
+
+    if (!main_client.begin(endpoint))
+    {
+        LOGW("begin(%s) failed", endpoint);
+    }
+    else if ((status = main_client.POST(payload.c_str(), payload.length())) >= HttpStatus_Ok)
+    {
+        if (b_debug) {
+            LOGD("status=%d response (%lu):\r\n%s", status, main_client.get_content_length(), main_client.get_content());
+        }
+
+        json.clear();
+        DeserializationError error = deserializeJson(json, main_client.get_content(), main_client.get_content_length());
+        if (error)
+        {
+            LOGW("deserializeJson() failed: %s", error.f_str());
+        }
+        else
+        {
+            b_status = true;
+        }
+    }
+
+    return b_status;
 #else
     bool b_status = false;
     bool b_stop   = false;
