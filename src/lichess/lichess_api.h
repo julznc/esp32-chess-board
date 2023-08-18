@@ -23,15 +23,22 @@ public:
     static esp_err_t event_handler(esp_http_client_event_t *evt);
 
     bool begin(const char *endpoint);
+    void end();
+
     int GET(bool b_retry);
     int POST(const char *data, int len, bool b_retry);
+    bool startStream(const char *endpoint);
+    String readLine(void);
 
+    bool connected() const { return _connected; }
+    const String &getEndpoint(void) const { return _endpoint; }
     const char *get_content() const { return _rsp_buf; }
     size_t get_content_length() const { return _rsp_len; }
 
 protected:
     esp_http_client_handle_t    _client;
     esp_http_client_config_t    _config;
+    String                      _endpoint;
     bool                        _connected;
     char                        _auth[64];
     char                        _rsp_buf[2048];

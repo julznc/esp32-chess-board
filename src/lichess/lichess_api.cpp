@@ -28,7 +28,7 @@ APIClient::APIClient()
     _config.transport_type      = HTTP_TRANSPORT_OVER_SSL;
     _config.cert_pem            = LICHESS_ORG_PEM;
     _config.event_handler       = event_handler;
-    _config.timeout_ms          = 60000; // network timeout in ms
+    _config.timeout_ms          = 10000; // network timeout in ms
     _config.keep_alive_enable   = true;
     _config.keep_alive_idle     = 180;
     _config.keep_alive_interval = 180;
@@ -42,7 +42,7 @@ APIClient::APIClient()
 
 APIClient::~APIClient()
 {
-    esp_http_client_close(_client);
+    end();
     esp_http_client_cleanup(_client);
 }
 
@@ -72,7 +72,7 @@ esp_err_t APIClient::event_handler(esp_http_client_event_t *evt)
         break;
 
     case HTTP_EVENT_ON_DATA:
-        LOGD("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
+        //LOGD("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
 #if 0 // enable this if using "esp_http_client_perform()"
         if (!esp_http_client_is_chunked_response(evt->client))
         {
@@ -111,8 +111,9 @@ bool APIClient::begin(const char *endpoint)
 {
     esp_err_t err = ESP_OK;
 
+    _endpoint = endpoint;
+    _rsp_len  = 0;
     memset(_rsp_buf, 0, sizeof(_rsp_buf));
-    _rsp_len = 0;
 
     if (ESP_OK != (err = esp_http_client_set_url(_client, endpoint)))
     {
@@ -124,6 +125,11 @@ bool APIClient::begin(const char *endpoint)
     }
 
     return (ESP_OK == err);
+}
+
+void APIClient::end()
+{
+    esp_http_client_close(_client);
 }
 
 int APIClient::GET(bool b_retry)
@@ -236,6 +242,51 @@ esp_err_t APIClient::perform(const char *buffer, int len)
     return err;
 }
 
+bool APIClient::startStream(const char *endpoint)
+{
+    esp_err_t   err      = ESP_OK;
+    int         code     = 0;
+    bool        b_status = false;
+
+    if (!begin(endpoint))
+    {
+        LOGW("begin(%s) failed", endpoint);
+    }
+    else if ((code = GET(true)) < 0)
+    {
+        LOGW("get(%s) = %d", endpoint, code);
+    }
+    else
+    {
+        b_status = code >= HttpStatus_Ok;
+    }
+
+    return b_status;
+}
+
+String APIClient::readLine(void)
+{
+    String ret;
+
+    while (1)
+    {
+        char ch;
+        int len = esp_http_client_read(_client, &ch, 1);
+        if (len < 1) {
+            LOGW("read(1) = %d", len);
+            break; // error
+        }
+        if (len < 0) {
+            break; // no data yet
+        }
+        if ((ch < ' ') || (ch == '\n')) {
+            break; // terminator
+        }
+        ret += ch;
+    }
+
+    return ret;
+}
 
 ApiClient::SecClient::SecClient() : WiFiClientSecure()
 {

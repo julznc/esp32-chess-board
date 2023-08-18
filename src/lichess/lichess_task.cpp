@@ -26,7 +26,11 @@
 namespace lichess
 {
 
+#if 0
 static ApiClient        stream_client;  // both events-stream & board-state-stream connections
+#else
+static APIClient        stream_client;  // both events-stream & board-state-stream connections
+#endif
 static challenge_st     s_incoming_challenge;
 static String           str_current_moves;
 static String           str_last_move;
@@ -314,7 +318,7 @@ static void taskClient(void *)
             {
                 if (!stream_client.getEndpoint().startsWith("/api/board/game/stream"))
                 {
-                    stream_client.end(true);
+                    stream_client.end();
                     delay(1000);
 
                     // api/board/game/stream/{gameId}
@@ -340,7 +344,7 @@ static void taskClient(void *)
             else if (s_current_game.e_state > GAME_STATE_STARTED)
             {
                 LOGD("end game stream");
-                stream_client.end(true);
+                stream_client.end();
                 memset(&s_current_game, 0, sizeof(s_current_game));
                 CLEAR_BOTTOM_MENU();
                 delay(1000);
@@ -480,7 +484,6 @@ void init(void)
     memset(&s_current_game, 0, sizeof(s_current_game));
     memset(ac_username, 0, sizeof(ac_username));
 
-    stream_client.setReuse(false);
     e_state = CLIENT_STATE_INIT;
 
     xTaskCreate(
