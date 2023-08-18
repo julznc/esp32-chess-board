@@ -7,7 +7,7 @@
  */
 static const char      *LICHESS_API_HOST            = "lichess.org";
 static const char      *LICHESS_API_PROTOCOL        = "https";
-static const uint16_t   LICHESS_API_PORT            = 443; // default port
+static const uint16_t   LICHESS_API_PORT            = 443; // default https port
 
 /**
  * configurable

@@ -4,6 +4,8 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 
+#include <esp_http_client.h>
+
 #include "lichess_api.h"
 #include "lichess_board.h"
 #include "lichess_challenges.h"
@@ -12,6 +14,32 @@
 namespace lichess
 {
 
+class APIClient
+{
+public:
+    APIClient();
+    ~APIClient();
+
+    static esp_err_t event_handler(esp_http_client_event_t *evt);
+
+    bool begin(const char *endpoint);
+    int GET();
+    int POST(const char *data, int len);
+
+    const char *get_content() const { return _rsp_buf; }
+    size_t get_content_length() const { return _rsp_len; }
+
+protected:
+    esp_http_client_handle_t    _client;
+    esp_http_client_config_t    _config;
+    char                        _auth[64];
+    char                        _rsp_buf[2048];
+    size_t                      _rsp_len;
+};
+
+// fix me:
+// https://stackoverflow.com/questions/72242061/esp-32-http-get-is-so-slow
+// https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/protocols/esp_http_client.html#persistent-connections
 class ApiClient : public HTTPClient
 {
     class SecClient : public WiFiClientSecure

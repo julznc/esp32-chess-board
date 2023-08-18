@@ -1,4 +1,6 @@
 
+#include <functional>   // std::bind
+
 #include "globals.h"
 
 #include "chess/chess.h"
@@ -12,7 +14,161 @@
 namespace lichess
 {
 
+#if 0
 static ApiClient        main_client;    // main connection (non-stream)
+#else
+static APIClient        main_client;    // main connection (non-stream)
+#endif
+
+
+APIClient::APIClient()
+{
+    _config.host                = LICHESS_API_HOST;
+    _config.path                = "/api";
+    _config.transport_type      = HTTP_TRANSPORT_OVER_SSL;
+    _config.cert_pem            = LICHESS_ORG_PEM;
+    _config.event_handler       = event_handler;
+    _config.keep_alive_enable   = true;
+    _config.user_data           = this;
+
+    _client = esp_http_client_init(&_config);
+
+    snprintf(_auth, sizeof(_auth), "Bearer %s", LICHESS_API_ACCESS_TOKEN);
+}
+
+APIClient::~APIClient()
+{
+    esp_http_client_cleanup(_client);
+}
+
+esp_err_t APIClient::event_handler(esp_http_client_event_t *evt)
+{
+    //LOGI("%s(%d)", __func__, evt->event_id);
+
+    APIClient *cli = (APIClient *)evt->user_data;
+
+    switch (evt->event_id)
+    {
+    case HTTP_EVENT_ERROR:
+        LOGW("HTTP_EVENT_ERROR");
+        break;
+
+    case HTTP_EVENT_ON_CONNECTED:
+        LOGI("HTTP_EVENT_ON_CONNECTED");
+        break;
+
+    case HTTP_EVENT_HEADERS_SENT:
+        LOGD("HTTP_EVENT_HEADERS_SENT");
+        break;
+
+    case HTTP_EVENT_ON_HEADER:
+        LOGD("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+        break;
+
+    case HTTP_EVENT_ON_DATA:
+        LOGD("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        if (!esp_http_client_is_chunked_response(evt->client))
+        {
+            int remaining = sizeof(cli->_rsp_buf) - cli->_rsp_len;
+            int copy_len  = evt->data_len;
+            if (copy_len > remaining) {
+                LOGW("need more %d/%d bytes", copy_len - remaining, remaining);
+                if (remaining < 1) {
+                    return ESP_FAIL; // buffer full
+                }
+                copy_len = remaining;
+            }
+            if (copy_len > 0) {
+                memcpy(cli->_rsp_buf + cli->_rsp_len, evt->data, copy_len);
+                cli->_rsp_len += copy_len;
+                //LOGD("response (%lu)\r\n%.*s", cli->_rsp_len, cli->_rsp_len, cli->_rsp_buf);
+            }
+        }
+        break;
+
+    case HTTP_EVENT_ON_FINISH:
+        LOGD("HTTP_EVENT_ON_FINISH");
+        //LOGD("response (%lu)\r\n%.*s", cli->_rsp_len, cli->_rsp_len, cli->_rsp_buf);
+        break;
+
+    case HTTP_EVENT_DISCONNECTED:
+        LOGW("HTTP_EVENT_DISCONNECTED");
+        break;
+    }
+
+    return ESP_OK;
+}
+
+bool APIClient::begin(const char *endpoint)
+{
+    esp_err_t err = ESP_OK;
+
+    memset(_rsp_buf, 0, sizeof(_rsp_buf));
+    _rsp_len = 0;
+
+    if (ESP_OK != (err = esp_http_client_set_url(_client, endpoint)))
+    {
+        LOGW("failed set_url(%s) (err=%x)", endpoint, err);
+    }
+    else if (ESP_OK != (err = esp_http_client_set_header(_client, "Authorization", _auth)))
+    {
+        LOGW("failed set_auth(%s) (err=%x)", _auth, err);
+    }
+
+    return (ESP_OK == err);
+}
+
+int APIClient::GET()
+{
+    esp_err_t   err  = ESP_OK;
+    int         code = 0;
+
+    if (ESP_OK != (err = esp_http_client_set_method(_client, HTTP_METHOD_GET)))
+    {
+        LOGW("failed set_method(%d) (err=%x)", HTTP_METHOD_GET, err);
+        code = -err;
+    }
+    else if (ESP_OK != (err = esp_http_client_perform(_client)))
+    {
+        LOGW("failed get() (err=%x)", err);
+        code = -err;
+    }
+    else
+    {
+        code = esp_http_client_get_status_code(_client);
+    }
+
+    return code;
+}
+
+int APIClient::POST(const char *data, int len)
+{
+    esp_err_t   err  = ESP_OK;
+    int         code = 0;
+
+    if (ESP_OK != (err = esp_http_client_set_method(_client, HTTP_METHOD_POST)))
+    {
+        LOGW("failed set_method(%d) (err=%x)", HTTP_METHOD_GET, err);
+        code = -err;
+    }
+    else if (ESP_OK != (err = esp_http_client_set_post_field(_client, data, len)))
+    {
+        LOGW("failed set_post_field(%d) (err=%x)", len, err);
+        code = -err;
+    }
+    else if (ESP_OK != (err = esp_http_client_perform(_client)))
+    {
+        LOGW("failed post() (err=%x)", err);
+        code = -err;
+    }
+    else
+    {
+        code = esp_http_client_get_status_code(_client);
+    }
+
+    return code;
+}
+
 
 
 ApiClient::SecClient::SecClient() : WiFiClientSecure()
@@ -298,6 +454,34 @@ String ApiClient::readLine(void)
 bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
 {
     bool b_status = false;
+#if 1
+    int  status = 0;
+    if (!main_client.begin(endpoint))
+    {
+        LOGW("begin(%s) failed", endpoint);
+    }
+    else if ((status = main_client.GET()) < HttpStatus_Ok)
+    {
+        //
+    }
+    else
+    {
+        if (b_debug) {
+            LOGD("status=%d response (%lu):\r\n%s", status, main_client.get_content_length(), main_client.get_content());
+        }
+
+        json.clear();
+        DeserializationError error = deserializeJson(json, main_client.get_content(), main_client.get_content_length());
+        if (error)
+        {
+            LOGW("deserializeJson() failed: %s", error.f_str());
+        }
+        else
+        {
+            b_status = true;
+        }
+    }
+#else
     bool b_stop   = false;
 
     if (!main_client.begin(endpoint))
@@ -344,12 +528,15 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
     }
 
     //main_client.end(b_stop);
-
+#endif
     return b_status;
 }
 
 bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, bool b_debug)
 {
+#if 1
+    return false;
+#else
     bool b_status = false;
     bool b_stop   = false;
 
@@ -405,6 +592,7 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
     //main_client.end(b_stop);
 
     return b_status;
+#endif
 }
 
 } // namespace lichess
