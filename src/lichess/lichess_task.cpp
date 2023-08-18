@@ -26,11 +26,7 @@
 namespace lichess
 {
 
-#if 0
-static ApiClient        stream_client;  // both events-stream & board-state-stream connections
-#else
 static APIClient        stream_client;  // both events-stream & board-state-stream connections
-#endif
 static challenge_st     s_incoming_challenge;
 static String           str_current_moves;
 static String           str_last_move;
