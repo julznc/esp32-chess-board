@@ -16,6 +16,8 @@ namespace lichess
 
 static APIClient        main_client;    // main connection (non-stream)
 
+static const int        CLIENT_TIMEOUT_MS = ((WDT_TIMEOUT_SEC - 1) * 1000);
+
 
 APIClient::APIClient()
 {
@@ -24,7 +26,7 @@ APIClient::APIClient()
     _config.transport_type      = HTTP_TRANSPORT_OVER_SSL;
     _config.cert_pem            = LICHESS_ORG_PEM;
     _config.event_handler       = event_handler;
-    _config.timeout_ms          = 60000; // network timeout in ms
+    _config.timeout_ms          = CLIENT_TIMEOUT_MS; // network timeout in ms
     _config.keep_alive_enable   = true;
     _config.keep_alive_idle     = 180;
     _config.keep_alive_interval = 180;
@@ -55,7 +57,7 @@ esp_err_t APIClient::event_handler(esp_http_client_event_t *evt)
         break;
 
     case HTTP_EVENT_ON_CONNECTED:
-        LOGI("HTTP_EVENT_ON_CONNECTED");
+        LOGI("HTTP_EVENT_ON_CONNECTED %s", cli->_endpoint.c_str());
         cli->_connected = true;
         break;
 
@@ -216,7 +218,11 @@ esp_err_t APIClient::perform(const char *buffer, int len)
     {
         err = ESP_ERR_HTTP_FETCH_HEADER;
         LOGW("failed fetch_headers() (err=%x)", err);
+      #if 1
         esp_http_client_close(_client); // workaround
+      #else
+        _connected = false;
+      #endif
     }
     else
     {
@@ -245,6 +251,7 @@ bool APIClient::startStream(const char *endpoint)
     bool        b_status = false;
 
     LOGD("%s(%s)", __func__, endpoint);
+    esp_http_client_set_timeout_ms(_client, CLIENT_TIMEOUT_MS);
 
     if (!begin(endpoint))
     {
@@ -256,6 +263,7 @@ bool APIClient::startStream(const char *endpoint)
     }
     else
     {
+        esp_http_client_set_timeout_ms(_client, 10);
         b_status = code >= HttpStatus_Ok;
     }
 
@@ -266,16 +274,13 @@ String APIClient::readLine(void)
 {
     String ret;
 
-    while (1)
+    while (_connected)
     {
         char ch;
         int len = esp_http_client_read(_client, &ch, 1);
         if (len < 1) {
-            LOGW("read(1) = %d", len);
-            break; // error
-        }
-        if (len < 0) {
-            break; // no data yet
+            //LOGW("read(1) = %d", len);
+            break; // error or no data yet
         }
         if ((ch < ' ') || (ch == '\n')) {
             break; // terminator
