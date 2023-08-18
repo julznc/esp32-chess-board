@@ -23,8 +23,8 @@ public:
     static esp_err_t event_handler(esp_http_client_event_t *evt);
 
     bool begin(const char *endpoint);
-    int GET();
-    int POST(const char *data, int len);
+    int GET(bool b_retry);
+    int POST(const char *data, int len, bool b_retry);
 
     const char *get_content() const { return _rsp_buf; }
     size_t get_content_length() const { return _rsp_len; }

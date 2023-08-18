@@ -73,7 +73,7 @@ esp_err_t APIClient::event_handler(esp_http_client_event_t *evt)
 
     case HTTP_EVENT_ON_DATA:
         LOGD("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
-#if 0
+#if 0 // enable this if using "esp_http_client_perform()"
         if (!esp_http_client_is_chunked_response(evt->client))
         {
             int remaining = sizeof(cli->_rsp_buf) - cli->_rsp_len;
@@ -126,7 +126,7 @@ bool APIClient::begin(const char *endpoint)
     return (ESP_OK == err);
 }
 
-int APIClient::GET()
+int APIClient::GET(bool b_retry)
 {
     esp_err_t   err  = ESP_OK;
     int         code = 0;
@@ -139,6 +139,10 @@ int APIClient::GET()
     else if (ESP_OK != (err = perform(NULL, 0)))
     {
         LOGW("failed get() (err=%x)", err);
+        if (b_retry) {
+            LOGW("retry");
+            return GET(false);
+        }
         code = -err;
     }
     else
@@ -149,7 +153,7 @@ int APIClient::GET()
     return code;
 }
 
-int APIClient::POST(const char *data, int len)
+int APIClient::POST(const char *data, int len, bool b_retry)
 {
     esp_err_t   err  = ESP_OK;
     int         code = 0;
@@ -171,6 +175,10 @@ int APIClient::POST(const char *data, int len)
     else if (ESP_OK != (err = perform(data, len)))
     {
         LOGW("failed post() (err=%x)", err);
+        if (b_retry) {
+            LOGW("retry");
+            return POST(data, len, b_retry);
+        }
         code = -err;
     }
     else
@@ -186,14 +194,10 @@ esp_err_t APIClient::perform(const char *buffer, int len)
     esp_err_t err = ESP_OK;
 
 #if 0
-    esp_http_client_open(_client, 0);
     err = esp_http_client_perform(_client);
-    if (ESP_OK != err)
+    if (ESP_ERR_HTTP_FETCH_HEADER == err)
     {
-        if (ESP_ERR_HTTP_FETCH_HEADER == err)
-        {
-            //esp_http_client_close(_client);
-        }
+        esp_http_client_close(_client); // workaround
     }
 #else
     if (ESP_OK != (err = esp_http_client_open(_client, len)))
@@ -208,9 +212,9 @@ esp_err_t APIClient::perform(const char *buffer, int len)
     }
     else if ((len = esp_http_client_fetch_headers(_client)) < 0)
     {
-        err = len;
+        err = ESP_ERR_HTTP_FETCH_HEADER;
         LOGW("failed fetch_headers() (err=%x)", err);
-        esp_http_client_close(_client);
+        esp_http_client_close(_client); // workaround
     }
     else
     {
@@ -524,7 +528,7 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
     {
         LOGW("begin(%s) failed", endpoint);
     }
-    else if ((status = main_client.GET()) >= HttpStatus_Ok)
+    else if ((status = main_client.GET(true)) >= HttpStatus_Ok)
     {
         if (b_debug) {
             LOGD("status=%d response (%lu):\r\n%s", status, main_client.get_content_length(), main_client.get_content());
@@ -557,7 +561,7 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
     {
         LOGW("begin(%s) failed", endpoint);
     }
-    else if ((status = main_client.POST(payload.c_str(), payload.length())) >= HttpStatus_Ok)
+    else if ((status = main_client.POST(payload.c_str(), payload.length(), true)) >= HttpStatus_Ok)
     {
         if (b_debug) {
             LOGD("status=%d response (%lu):\r\n%s", status, main_client.get_content_length(), main_client.get_content());
