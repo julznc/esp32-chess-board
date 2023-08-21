@@ -17,101 +17,27 @@ static ApiClient        main_client;    // main connection (non-stream)
 
 ApiClient::SecClient::SecClient() : WiFiClientSecure()
 {
+    _timeout = 20;
+
     // to do: load from preferences
     _CA_cert = LICHESS_ORG_PEM; // setCACert()
 }
 
-int ApiClient::SecClient::connect(const char *host, uint16_t port, int32_t timeout)
-{
-    uint32_t ms_start = millis();
-    LOGD("call WiFiClientSecure::connect(%s:%u)", host, port);
-    int result = WiFiClientSecure::connect(host, port, timeout);
-    LOGI("%s() = %d (%lums)", __func__, result, millis() - ms_start);
-    return result;
-}
-
 uint8_t ApiClient::SecClient::connected()
 {
-#if 0 // slow?
-    uint32_t ms_start = millis();
-    LOGD("call WiFiClientSecure::connected()");
-    uint8_t result = WiFiClientSecure::connected();
-    LOGI("%s() = %d (%lums)", __func__, result, millis() - ms_start);
-    return result;
-#elif 0
+#if 0
     return WiFiClientSecure::connected();
 #else
-  #if 0
-    uint8_t dummy = 0;
-    read(&dummy, 0);
-  #else
-    mbedtls_ssl_read(&sslclient->ssl_ctx, NULL, 0);
-  #endif
-
+    int err = mbedtls_ssl_read(&sslclient->ssl_ctx, NULL, 0);
+    if ((err < 0) && (MBEDTLS_ERR_SSL_WANT_READ != err) && (MBEDTLS_ERR_SSL_WANT_WRITE != err))
+    {
+        //LOGW("ssl_read(0) = -0x%x", -err);
+        stop();
+    }
     return _connected;
 #endif
 }
 
-int ApiClient::SecClient::available()
-{
-#if 0
-    return WiFiClientSecure::available();
-#else
-    int peeked = (_peek >= 0);
-    if (!_connected) {
-        return peeked;
-    }
-    int res = data_to_read(sslclient);
-    if (res < 0) {
-        LOGW("data_to_read() = %d", res);
-      #if 1
-        stop();
-        return peeked ? peeked : res;
-      #else
-        if (MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY != res) {
-            stop();
-        }
-        return peeked ? peeked : res;
-      #endif
-    }
-    return res + peeked;
-#endif
-}
-
-int ApiClient::SecClient::read(uint8_t *buf, size_t size)
-{
-#if 0
-    return WiFiClientSecure::read(buf, size);
-#else
-    int peeked = 0;
-    int avail = available();
-    if ((!buf && size) || avail <= 0) {
-        return -1;
-    }
-    if(!size){
-        return 0;
-    }
-    if(_peek >= 0){
-        buf[0] = _peek;
-        _peek = -1;
-        size--;
-        avail--;
-        if(!size || !avail){
-            return 1;
-        }
-        buf++;
-        peeked = 1;
-    }
-
-    int res = get_ssl_receive(sslclient, buf, size);
-    if (res < 0) {
-        LOGW("get_ssl_receive() = %d", res);
-        stop();
-        return peeked?peeked:res;
-    }
-    return res + peeked;
-#endif
-}
 
 ApiClient::ApiClient() : HTTPClient(), _auth("Bearer ")
 {
@@ -138,7 +64,7 @@ bool ApiClient::connect(void)
 {
     bool b_status;
     uint32_t ms_start = millis();
-#if 1
+#if 0
     b_status = HTTPClient::connect();
 #else
     b_status = _secClient.connected();
@@ -152,13 +78,18 @@ bool ApiClient::connect(void)
         else
         {
             _client->setTimeout((_tcpTimeout + 500) / 1000);
-            LOGD("connected to %s:%u", _host.c_str(), _port);
-            b_status = true; //_secClient.connected();
+            //LOGD("connected to %s:%u", _host.c_str(), _port);
+            b_status = _secClient.connected();
         }
     }
 #endif
-    LOGI("%s() = %d (%lums)", __func__, b_status, millis() - ms_start);
+    LOGD("%s %s (%lums)", __func__, b_status ? "ok" : "failed", millis() - ms_start);
     return b_status;
+}
+
+bool ApiClient::connected()
+{
+    return _secClient.connected();
 }
 
 void ApiClient::end(bool b_stop)
@@ -230,15 +161,6 @@ int ApiClient::sendRequest(const char *type, uint8_t *payload, size_t size)
 
     return code;
 #endif
-}
-
-int ApiClient::handleHeaderResponse()
-{
-    int code;
-    uint32_t ms_start = millis();
-    code = HTTPClient::handleHeaderResponse();
-    LOGI("handleHeaderResponse() = %d (%lums)", code, millis() - ms_start);
-    return code;
 }
 
 bool ApiClient::startStream(const char *endpoint)

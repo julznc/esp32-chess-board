@@ -18,19 +18,16 @@ class ApiClient : public HTTPClient
     {
     public:
         SecClient();
-        int connect(const char *host, uint16_t port, int32_t timeout);
         uint8_t connected();
-        int available();
-        int read(uint8_t *buf, size_t size);
     };
 public:
     ApiClient();
 
     bool begin(const char *endpoint);
     bool connect(void);
+    bool connected();
     void end(bool b_stop /*close ssl connection*/);
     int sendRequest(const char *type, uint8_t *payload=NULL, size_t size=0);
-    int handleHeaderResponse();
     bool startStream(const char *endpoint);
     String readLine(void);
 

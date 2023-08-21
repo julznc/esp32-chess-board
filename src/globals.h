@@ -8,7 +8,7 @@
 
 // app firmware info
 #define K_APP_NAME                  "Electronic Chess Board"
-#define K_APP_VERSION               "01.04.19"
+#define K_APP_VERSION               "01.04.20"
 
 
 // for esp32-s2: RX1=18, TX1=17
@@ -55,7 +55,7 @@
 #define ASSERT(cond, msg, ...)      if (!(cond)) { LOGE(msg, ## __VA_ARGS__);  while (1) { LED_ON(); delay(100); LED_OFF(); delay(100); } }
 
 
-#define WDT_TIMEOUT_SEC             (20)
+#define WDT_TIMEOUT_SEC             (30)
 #define WDT_WATCH(task)             esp_task_wdt_add(task)  // "task=NULL" -> add current thread to WDT watch
 #define WDT_UNWATCH(task)           esp_task_wdt_delete(task)
 #define WDT_FEED()                  esp_task_wdt_reset()
