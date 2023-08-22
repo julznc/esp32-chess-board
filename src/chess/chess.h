@@ -104,7 +104,7 @@ typedef struct {
 
 
 void init(void);
-void loop(void);
+void loop(uint32_t ms_last_changed);
 
 const char *generate_fen(const game_st *p_game);
 

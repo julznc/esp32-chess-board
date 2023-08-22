@@ -243,9 +243,10 @@ static inline uint8_t read_piece(uint16_t u8_expected_piece, uint8_t u8_retry, b
     return 0;
 }
 
-static void scan(void)
+static uint32_t scan(void)
 {
     static const uint8_t MAX_READ_RETRIES = 16;
+    static uint32_t ms_last_toggle = 0;
 
     for (uint8_t rank = 0; rank < 8; rank++)
     {
@@ -276,6 +277,8 @@ static void scan(void)
                 if (au8_pieces[idx] != piece)
                 {
                     au32_toggle_ms[idx] = millis();
+                    //LOGD("toggle %c on %c%u", piece ? piece : '-', 'a' + file, rank + 1);
+                    ms_last_toggle = au32_toggle_ms[idx];
                 }
             }
 
@@ -286,6 +289,7 @@ static void scan(void)
 
     }
     //LOGD("scan done");
+    return ms_last_toggle;
 }
 
 void init(void)
@@ -340,9 +344,8 @@ void loop(void)
         else
         {
             //uint32_t ms_start = millis();
-            scan();
+            chess::loop(scan());
             //LOGD("scan duration %lu ms", millis() - ms_start);
-            chess::loop();
         }
         break;
 

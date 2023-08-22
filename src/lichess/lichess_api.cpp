@@ -55,7 +55,8 @@ bool ApiClient::begin(const char *endpoint)
     _port       = LICHESS_API_PORT;
     _uri        = endpoint;
 
-    LOGD("protocol: %s, host: %s port: %d url: %s", _protocol.c_str(), _host.c_str(), _port, _uri.c_str());
+    //LOGD("protocol: %s, host: %s port: %d url: %s", _protocol.c_str(), _host.c_str(), _port, _uri.c_str());
+    LOGD("%s", _uri.c_str());
 
     return true;
 }
@@ -291,7 +292,7 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
         {
             String resp = main_client.readLine();
             if (b_debug) {
-                LOGD("response (%u):\r\n%s", resp.length(), resp.c_str());
+                LOGD("response (%u): %s", resp.length(), resp.c_str());
             }
 
             if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_CREATED == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))

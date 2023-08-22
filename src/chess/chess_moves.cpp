@@ -465,7 +465,7 @@ bool find_move(game_st *p_game /*board*/, move_st *list /*moves list*/, const ui
             undo_move(p_game);
 
             if (!different) {
-                LOGD("found move %c %c%u-%c%u (%02x)", elt->piece, ALGEBRAIC(elt->from), ALGEBRAIC(elt->to), elt->flags);
+                //LOGD("found move %c %c%u-%c%u (%02x)", elt->piece, ALGEBRAIC(elt->from), ALGEBRAIC(elt->to), elt->flags);
                 memcpy(p_move, elt, sizeof(move_st));
                 found = true;
                 break;

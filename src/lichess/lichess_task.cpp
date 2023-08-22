@@ -377,11 +377,14 @@ static void taskClient(void *)
                     }
                 }
 
-                if (!str_last_move.isEmpty() && (str_last_move != queue_move) && (fen_stats->turn != s_current_game.b_color))
+                if (!str_last_move.isEmpty() && (str_last_move != queue_move))
                 {
                     //LOGD("need queue %s? turn %d - %d", str_last_move.c_str(), fen_stats->turn, s_current_game.b_color);
                     queue_move = str_last_move;
-                    chess::queue_move(queue_move);
+                    if (last_move != queue_move)
+                    {
+                        chess::queue_move(queue_move);
+                    }
                 }
 
                 display_clock(s_current_game.b_turn, true);

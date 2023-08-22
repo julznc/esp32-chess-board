@@ -422,10 +422,8 @@ static inline bool check_start_fen(void)
     return (0 == u8_diff);
 }
 
-void loop(void)
+void loop(uint32_t ms_last_changed)
 {
-    static uint32_t u32_last_checked = 0;
-
     uint8_t au8_allowed_squares[28];
     uint8_t u8_squares_count;
 
@@ -434,7 +432,7 @@ void loop(void)
     if (!s_game.history) // if no moves yet
     {
         // if upper-left button was pressed ...
-        if ((millis() - u32_last_checked > 1000UL) && (MAIN_BTN.shortPressed()))
+        if ((millis() - ms_last_changed > 1000UL) && (MAIN_BTN.shortPressed()))
         {
             MAIN_BTN.resetCount();
             b_skip_start_fen = true; // allow custom position
@@ -442,7 +440,6 @@ void loop(void)
                 s_game.stats.turn = SWAP_COLOR(s_game.stats.turn); // toggle turn
                 LOGD("new fen: %s", generate_fen(&s_game));
             }
-            u32_last_checked = millis();
         }
     }
 
@@ -468,17 +465,15 @@ void loop(void)
         }
         ui::leds::update();
     }
-    else if (millis() - u32_last_checked < 500)
-    {
-        //LOGD("blanking");
-    }
     else
     {
         move_st move;
         move_st *moves_list = generate_moves(&s_game);
 
-                // exact move
-        if (find_move(&s_game, moves_list, pu8_pieces, &move))
+        // exact move with blanking
+  #define VALID_MOVE()      ((millis() - ms_last_changed > 780) && find_move(&s_game, moves_list, pu8_pieces, &move))
+
+        if (VALID_MOVE())
         {
             do_move(moves_list, &move);
         }
@@ -506,8 +501,9 @@ void loop(void)
                 unlock();
                 clear_moves(&moves_list);
                 moves_list = generate_moves(&s_game);
-                if (find_move(&s_game, moves_list, pu8_pieces, &move))
+                if (VALID_MOVE())
                 {
+                    LOGD("continue move %c%u%c%u", ALGEBRAIC(move.from), ALGEBRAIC(move.to));
                     do_move(moves_list, &move);
                 }
                 else
@@ -530,8 +526,6 @@ void loop(void)
         }
 
         clear_moves(&moves_list);
-
-        u32_last_checked = millis();
     }
 }
 
@@ -721,7 +715,7 @@ bool queue_move(const String &move)
         {
             if ((to_sq != pending_move.to) || (from_sq != pending_move.from))
             {
-                LOGD("queue %c%u %c%u", ALGEBRAIC(from_sq), ALGEBRAIC(to_sq));
+                LOGD("queue %c%u%c%u", ALGEBRAIC(from_sq), ALGEBRAIC(to_sq));
                 lock();
                 pending_move.piece = s_game.board[from_sq];
                 pending_move.from = from_sq;
