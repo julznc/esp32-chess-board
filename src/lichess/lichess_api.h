@@ -54,6 +54,8 @@ typedef enum
  */
 void init(void);
 bool get_username(String &name);
+size_t set_token(const char *token);
+void get_token(String &token);
 
 
 /*

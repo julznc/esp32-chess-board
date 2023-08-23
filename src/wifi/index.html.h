@@ -48,7 +48,7 @@ form input { margin: 2px auto;}
     <div class="panel">
       <form method="post" action="/lichess-token">
         <fieldset><legend>Access Token</legend>
-          <input type="text" name="token" size="32" required><input type="submit" value="Set"><br><br>
+          <input type="text" name="token" size="32" minlength="20" required><input type="submit" value="Set"><br><br>
           <a href="https://lichess.org/account/oauth/token/create?scopes[]=challenge:write&scopes[]=challenge:read&scopes[]=board:play" target="_blank">Generate a personal access token.</a>
         </fieldset>
       </form><br>
@@ -94,7 +94,7 @@ form input { margin: 2px auto;}
   const txt_pgn = document.getElementById("txt-pgn");
   fetch("/username").then(function(rsp) {
     rsp.text().then(function (txt) {
-      if (txt) {
+      if (txt.length >= 3) {
         txt_username.innerText = "@" + txt; txt_username.setAttribute("href", "https://lichess.org/@/" + txt);
       } else {
         txt_username.innerText = "unknown Lichess account"; txt_username.style.color = "#e00";
@@ -105,7 +105,7 @@ form input { margin: 2px auto;}
     rsp.text().then(function (txt) { txt_ver.innerText = "FW v" + txt; });
   }).catch(function(err){ console.log(err); });
   fetch("/pgn").then(function(rsp) {
-    rsp.text().then(function (txt) { txt_pgn.innerText = txt ? txt : "..."; });
+    rsp.text().then(function (txt) { txt_pgn.innerText = txt; });
   }).catch(function(err){ console.log(err); });
 })();
   </script>

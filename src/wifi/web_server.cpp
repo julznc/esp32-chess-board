@@ -28,8 +28,15 @@ static void handlePostToken()
 {
     String token = server.arg("token");
     LOGD("token: %s", token.c_str());
-    server.send(200, "text/plain", "to do");
-    //server.send(302, "text/html", "<head><meta http-equiv=\"refresh\" content=\"0;url=/\"></head>");
+    if (token.length() >= 20 /*min token length?*/)
+    {
+        size_t len = lichess::set_token(token.c_str());
+        server.send(200, "text/plain", len >= token.length() ? "ok" : "failed");
+    }
+    else
+    {
+        server.send(400, "text/plain", "failed");
+    }
 }
 
 static void handlePostChallenge()
@@ -92,12 +99,12 @@ void serverSetup(void)
 
     server.on("/username", HTTP_GET, []() {
         String name;
-        server.send((lichess::get_username(name) && !name.isEmpty()) ? 200 : 404, "text/plain", name);
+        server.send(lichess::get_username(name) ? 200 : 404, "text/plain", name.isEmpty() ? "?" : name);
     });
 
     server.on("/pgn", HTTP_GET, []() {
         String pgn;
-        server.send(chess::get_pgn(pgn) ? 200 : 404, "text/plain", pgn);
+        server.send(chess::get_pgn(pgn) ? 200 : 404, "text/plain", pgn.isEmpty() ? "..." : pgn);
     });
 
     server.on("/lichess-token", HTTP_POST, handlePostToken);

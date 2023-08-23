@@ -11,9 +11,7 @@ static const uint16_t   LICHESS_API_PORT            = 443; // default port
 
 /**
  * configurable
- * to do: load from Preferences
  */
-static const char      *LICHESS_API_ACCESS_TOKEN    = "lip_WFDx9jsINha7GznSYwbm";
 static const char      *LICHESS_ORG_PEM =
 R"rawliteral(-----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw

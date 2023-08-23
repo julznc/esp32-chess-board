@@ -1,4 +1,6 @@
 
+#include <Preferences.h>
+
 #include "globals.h"
 
 #include "chess/chess.h"
@@ -33,6 +35,7 @@ static String           str_last_move;
 static game_st          s_current_game;
 
 static char             ac_username[32];
+static Preferences      configs;
 DynamicJsonDocument     response(2*1024);
 
 
@@ -254,6 +257,7 @@ static void taskClient(void *)
     challenge_st    s_challenge; // outgoing challenge
     const chess::stats_st *fen_stats = NULL;
     bool            b_level_adjusted = false;
+    uint8_t         u8_error_count   = 0;
 
     WDT_WATCH(NULL);
 
@@ -274,7 +278,7 @@ static void taskClient(void *)
         switch (e_state)
         {
         case CLIENT_STATE_INIT:
-            if (wifi::is_ntp_connected())
+            if ((u8_error_count < 10) && wifi::is_ntp_connected())
             {
                 e_state = CLIENT_STATE_GET_ACCOUNT;
             }
@@ -290,17 +294,20 @@ static void taskClient(void *)
                 if (stream_client.startStream("/api/stream/event"))
                 {
                     LOGI("monitor events ok");
+                    u8_error_count = 0;
                     e_state = CLIENT_STATE_CHECK_EVENTS;
                 }
                 else
                 {
+                    u8_error_count++;
                     e_state = CLIENT_STATE_IDLE;
                 }
             }
             else
             {
-                delay(5000UL);
+                u8_error_count++;
                 e_state = CLIENT_STATE_INIT;
+                delay(5000UL);
             }
             break;
 
@@ -484,13 +491,20 @@ void init(void)
     stream_client.setReuse(false);
     e_state = CLIENT_STATE_INIT;
 
-    xTaskCreate(
-        taskClient,     /* Task function. */
-        "taskClient",   /* String with name of task. */
-        32*1024,        /* Stack size in bytes. */
-        NULL,           /* Parameter passed as input of the task */
-        4,              /* Priority of the task. */
-        NULL);          /* Task handle. */
+    if (!configs.begin("lichess", false))
+    {
+        LOGE("load configs failed");
+    }
+    else
+    {
+        xTaskCreate(
+            taskClient,     /* Task function. */
+            "taskClient",   /* String with name of task. */
+            32*1024,        /* Stack size in bytes. */
+            NULL,           /* Parameter passed as input of the task */
+            4,              /* Priority of the task. */
+            NULL);          /* Task handle. */
+    }
 }
 
 bool get_username(String &name)
@@ -501,6 +515,19 @@ bool get_username(String &name)
         return true;
     }
     return false;
+}
+
+size_t set_token(const char *token)
+{
+    size_t len = configs.putString("token", token);
+    LOGI("set(%s) = %lu", token, len);
+    return len;
+}
+
+void get_token(String &token)
+{
+    token = configs.getString("token");
+    //LOGD("token = %s", token.c_str());
 }
 
 } // namespace lichess

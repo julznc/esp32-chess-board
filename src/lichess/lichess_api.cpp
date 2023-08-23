@@ -39,14 +39,26 @@ uint8_t ApiClient::SecClient::connected()
 }
 
 
-ApiClient::ApiClient() : HTTPClient(), _auth("Bearer ")
+ApiClient::ApiClient() : HTTPClient()
 {
-    // to do: load from preferences
-    _auth += LICHESS_API_ACCESS_TOKEN;
+    //
 }
 
 bool ApiClient::begin(const char *endpoint)
 {
+    String token;
+
+    get_token(token);
+
+    if (token.isEmpty())
+    {
+        LOGW("unknown access");
+        return false;
+    }
+
+    _auth       = "Bearer ";
+    _auth      += token;
+
     _client     = &_secClient;
     _secure     = true;
 
