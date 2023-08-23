@@ -1,3 +1,4 @@
+#include <Preferences.h>
 #include <sntp.h>
 #include <esp_wifi.h>
 
@@ -25,6 +26,7 @@ namespace wifi
 static String               hostname = AP_SSID_PREFIX; // soft-ap name
 static String               host_ssid;
 static IPAddress            ip;
+static Preferences          configs;
 static volatile bool        b_ntp_connected = false;
 static volatile uint32_t    ms_soft_ap;     // AP fallback start timestamp
 
@@ -97,6 +99,10 @@ static inline bool scan()
     int stationsFound = WiFi.scanNetworks();
     LOGD("%i networks found", stationsFound);
 
+    String cfg_ssid;
+    String cfg_passwd;
+    wifi::get_credentials(cfg_ssid, cfg_passwd);
+
     for (int i = 0; i < stationsFound; ++i)
     {
         String  bssid = WiFi.BSSIDstr(i);
@@ -104,19 +110,16 @@ static inline bool scan()
         int     rssi  = WiFi.RSSI(i);
         PRINTF("%2d. %s %s (%idBm)", i + 1, bssid.c_str(), ssid.c_str(), rssi);
 
-        for (int j = 0; j < NUM_KNOWN_STAIONS; j++)
+        if (cfg_ssid.length() && cfg_passwd.length() && (ssid == cfg_ssid))
         {
-            if (0 == strcmp(KNOWN_STATIONS[j].ssid, ssid.c_str()))
-            {
-                PRINTF(" - known!");
-                // store idx and pw
-                s_found_stations.as_ap[s_found_stations.u8_total].u8_idx = i; // store
-                strncpy(s_found_stations.as_ap[s_found_stations.u8_total].passphrase, KNOWN_STATIONS[j].password, 64 - 1);
-                // increment
-                s_found_stations.u8_total++;
-                break;
-            }
+            PRINTF(" - known!");
+            // store idx and pw
+            s_found_stations.as_ap[s_found_stations.u8_total].u8_idx = i; // store
+            strncpy(s_found_stations.as_ap[s_found_stations.u8_total].passphrase, cfg_passwd.c_str(), 64 - 1);
+            // increment
+            s_found_stations.u8_total++;
         }
+
         PRINTF("\r\n");
 
         if (s_found_stations.u8_total >= MAX_FOUND_STATIONS) {
@@ -361,13 +364,37 @@ void setup(void)
 
     e_state = WIFI_STATE_INIT;
 
-    xTaskCreate(
-        taskWiFi,       /* Task function. */
-        "taskWiFi",     /* String with name of task. */
-        16*1024,        /* Stack size in bytes. */
-        NULL,           /* Parameter passed as input of the task */
-        3,              /* Priority of the task. */
-        NULL);          /* Task handle. */
+    if (!configs.begin("wifi-cfg", false))
+    {
+        LOGE("load configs failed");
+    }
+    else
+    {
+        xTaskCreate(
+            taskWiFi,       /* Task function. */
+            "taskWiFi",     /* String with name of task. */
+            16*1024,        /* Stack size in bytes. */
+            NULL,           /* Parameter passed as input of the task */
+            3,              /* Priority of the task. */
+            NULL);          /* Task handle. */
+    }
+}
+
+bool set_credentials(const char *ssid, const char *passwd)
+{
+    if (!configs.putString("ssid", ssid) ||
+        !configs.putString("passwd", passwd))
+    {
+        return false;
+    }
+    return true;
+}
+
+bool get_credentials(String &ssid, String &passwd)
+{
+    ssid = configs.getString("ssid");
+    passwd = configs.getString("passwd");
+    return (ssid.length() > 0) && (passwd.length() > 0);
 }
 
 bool is_ntp_connected(void)

@@ -1,6 +1,7 @@
 
 #include <WebServer.h>
 #include <Update.h>
+#include <nvs_flash.h>
 
 #include "globals.h"
 
@@ -9,6 +10,7 @@
 
 #include "web_server_cfg.h"
 #include "web_server.h"
+#include "wifi_setup.h"
 
 #include "index.html.h"
 #include "favicon.svg.h"
@@ -45,11 +47,9 @@ static void handleSetGameOptions()
     String increment = server.arg("clock-increment");
     String opponent  = server.arg("opponent");
 
-    LOGD("timecontrol: %d+%d, opponent: %s",
-        limit.toInt(), increment.toInt(), opponent.c_str());
-
     bool b_status = lichess::set_game_options(opponent, limit.toInt() * 60, increment.toInt());
-
+    LOGD("opponent: \"%s\" timecontrol: %d+%d (%s)",
+        opponent.c_str(), limit.toInt(), increment.toInt(), b_status ? "ok" : "failed");
     server.send(b_status ? 200 : 400, "text/plain", b_status ? "ok" : "failed");
 }
 
@@ -58,9 +58,9 @@ static void handlePostWiFiCfg()
     String ssid   = server.arg("ssid");
     String passwd = server.arg("passwd");
 
-    LOGD("wifi: %s (%s)", ssid.c_str(), passwd.c_str());
-
-    server.send(200, "text/plain", "to do");
+    bool b_status = wifi::set_credentials(ssid.c_str(), passwd.c_str());
+    LOGD("set wifi: %s (%s) %s", ssid.c_str(), passwd.c_str(), b_status ? "ok" : "failed");
+    server.send(b_status ? 200 : 400, "text/plain", b_status ? "ok" : "failed");
 }
 
 static void handlePostReset()
@@ -73,7 +73,16 @@ static void handlePostReset()
     }
     else if (server.hasArg("restore"))
     {
-        server.send(200, "text/plain", "to do: restore factory settings");
+        int err = 0;
+        err += nvs_flash_deinit();
+        //LOGD("nvs_flash_deinit() = %d", err);
+        err += nvs_flash_erase();
+        //LOGD("nvs_flash_erase() = %d", err);
+        err += nvs_flash_init();
+        //LOGD("nvs_flash_init() = %d", err);
+        server.send(err ? 500 : 200, "text/plain", String("restore factory settings ") + (err ? "failed" : "ok"));
+        delay(3000UL);
+        ESP.restart();
     }
     else
     {
@@ -110,13 +119,21 @@ void serverSetup(void)
     });
 
     server.on("/lichess-game", HTTP_GET, []() {
+        char rsp[128];
         String opponent;
         uint16_t u16_limit;
         uint8_t u8_increment;
         lichess::get_game_options(opponent, u16_limit, u8_increment);
-        char rsp[128];
         snprintf(rsp, sizeof(rsp), "{\"opponent\": \"%s\", \"limit\":%u, \"increment\": %u}",
                 opponent.c_str(), u16_limit / 60, u8_increment);
+        server.send(200, "application/json", rsp);
+    });
+
+    server.on("/wifi-cfg", HTTP_GET, []() {
+        char rsp[64];
+        String ssid, passwd;
+        wifi::get_credentials(ssid, passwd);
+        snprintf(rsp, sizeof(rsp), "{\"ssid\": \"%s\", \"passwd\":\"%s\"}", ssid.c_str(), passwd.c_str());
         server.send(200, "application/json", rsp);
     });
 

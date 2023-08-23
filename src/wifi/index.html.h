@@ -71,8 +71,8 @@ form input { margin: 2px auto;}
       <form method="post" action="/wifi-cfg">
         <fieldset><legend>Configure Wi-Fi</legend>
           <label style="width: 8ch;">SSID</label>&nbsp;<input type="text" name="ssid" required><br>
-          <label style="width: 8ch;">Password</label>&nbsp;<input type="text" name="passwd" required><br>
-          <input type="submit" style="margin: 3px 10.5ch -2px; padding: 0 2ch;" value="Add">
+          <label style="width: 8ch;">Password</label>&nbsp;<input type="text" name="passwd" placeholder="********" required><br>
+          <input type="submit" style="margin: 3px 10.5ch -2px; padding: 0 2ch;" value="Set">
         </fieldset>
       </form><br><br>
       <form method='POST' action='/update' enctype='multipart/form-data'>
@@ -92,11 +92,8 @@ form input { margin: 2px auto;}
   fetch("/username").then(function(rsp) {
     rsp.text().then(function (txt) {
       const txt_username = document.getElementById("txt-username");
-      if (txt.length >= 3) {
-        txt_username.innerText = "@" + txt; txt_username.setAttribute("href", "https://lichess.org/@/" + txt);
-      } else {
-        txt_username.innerText = "unknown Lichess account"; txt_username.style.color = "#e00";
-      }
+      if (txt.length >= 3) { txt_username.innerText = "@" + txt; txt_username.setAttribute("href", "https://lichess.org/@/" + txt); }
+      else { txt_username.innerText = "unknown Lichess account"; txt_username.style.color = "#e00"; }
     });
   }).catch(function(err){ console.log(err); });
   fetch("/version").then(function(rsp) {
@@ -111,6 +108,9 @@ form input { margin: 2px auto;}
       document.querySelector('input[name="clock-increment"]').value = cfg.increment;
       document.querySelector('input[name="opponent"]').value = cfg.opponent;
     });
+  }).catch(function(err){ console.log(err); });
+  fetch("/wifi-cfg").then(function(rsp) {
+    rsp.json().then(function (creds) { document.querySelector('input[name="ssid"]').value = creds.ssid; });
   }).catch(function(err){ console.log(err); });
 })();
   </script>
