@@ -493,4 +493,14 @@ void init(void)
         NULL);          /* Task handle. */
 }
 
+bool get_username(String &name)
+{
+    if (e_state > CLIENT_STATE_GET_ACCOUNT)
+    {
+        name = ac_username;
+        return true;
+    }
+    return false;
+}
+
 } // namespace lichess

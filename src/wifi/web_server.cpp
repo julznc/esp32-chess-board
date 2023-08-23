@@ -4,6 +4,9 @@
 
 #include "globals.h"
 
+#include "chess/chess.h"
+#include "lichess/lichess_api.h"
+
 #include "web_server_cfg.h"
 #include "web_server.h"
 
@@ -21,35 +24,52 @@ static void handleRoot()
     server.send(200, "text/html", index_html);
 }
 
-static void handleGetUsername()
-{
-    server.send(200, "text/plain", "to do");
-}
-
-static void handleGetPgn()
-{
-    server.send(200, "text/plain", "to do");
-}
-
 static void handlePostToken()
 {
-    //server.send(200, "text/plain", "to do");
-    server.send(302, "text/html", "<head><meta http-equiv=\"refresh\" content=\"0;url=/\"></head>");
+    String token = server.arg("token");
+    LOGD("token: %s", token.c_str());
+    server.send(200, "text/plain", "to do");
+    //server.send(302, "text/html", "<head><meta http-equiv=\"refresh\" content=\"0;url=/\"></head>");
 }
 
 static void handlePostChallenge()
 {
+    String limit     = server.arg("clock-limit");
+    String increment = server.arg("clock-increment");
+    String opponent  = server.arg("opponent");
+
+    LOGD("timecontrol: %d+%d, opponent: %s",
+        limit.toInt(), increment.toInt(), opponent.c_str());
+
     server.send(200, "text/plain", "to do");
 }
 
 static void handlePostWiFiCfg()
 {
+    String ssid   = server.arg("ssid");
+    String passwd = server.arg("passwd");
+
+    LOGD("wifi: %s (%s)", ssid.c_str(), passwd.c_str());
+
     server.send(200, "text/plain", "to do");
 }
 
 static void handlePostReset()
 {
-    server.send(200, "text/plain", "to do");
+    if (server.hasArg("restart"))
+    {
+        server.send(200, "text/plain", "app reset");
+        delay(3000UL);
+        ESP.restart();
+    }
+    else if (server.hasArg("restore"))
+    {
+        server.send(200, "text/plain", "to do: restore factory settings");
+    }
+    else
+    {
+        server.send(404, "text/plain", "not found");
+    }
 }
 
 static void handleNotFound()
@@ -70,8 +90,16 @@ void serverSetup(void)
         server.send(200, "text/plain", K_APP_VERSION);
     });
 
-    server.on("/username", HTTP_GET, handleGetUsername);
-    server.on("/pgn", HTTP_GET, handleGetPgn);
+    server.on("/username", HTTP_GET, []() {
+        String name;
+        server.send((lichess::get_username(name) && !name.isEmpty()) ? 200 : 404, "text/plain", name);
+    });
+
+    server.on("/pgn", HTTP_GET, []() {
+        String pgn;
+        server.send(chess::get_pgn(pgn) ? 200 : 404, "text/plain", pgn);
+    });
+
     server.on("/lichess-token", HTTP_POST, handlePostToken);
     server.on("/lichess-challenge", HTTP_POST, handlePostChallenge);
     server.on("/wifi-cfg", HTTP_POST, handlePostWiFiCfg);

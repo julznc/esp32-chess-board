@@ -39,23 +39,23 @@ form input { margin: 2px auto;}
     <input class="tab-input" name="tabs" type="radio" id="tab-1" checked="checked"/>
     <label class="tab-label" for="tab-1">Home</label>
     <div class="panel">
-      <fieldset><legend>Info</legend> <span id="txt-username">...</span><br><span id="txt-ver">...</span><br></fieldset><br>
+      <fieldset><legend>Info</legend> <a id="txt-username" target="_blank">...</a><br><span id="txt-ver">...</span><br></fieldset><br>
       <fieldset><legend>PGN</legend><span id="txt-pgn">...</span><br></fieldset>
     </div>
 
-    <input class="tab-input" name="tabs" type="radio" id="tab-2" checked="checked"/>
+    <input class="tab-input" name="tabs" type="radio" id="tab-2"/>
     <label class="tab-label" for="tab-2">Lichess</label>
     <div class="panel">
       <form method="post" action="/lichess-token">
         <fieldset><legend>Access Token</legend>
-          <input type="text" name="token" size="32"><input type="submit" value="Set"><br><br>
+          <input type="text" name="token" size="32" required><input type="submit" value="Set"><br><br>
           <a href="https://lichess.org/account/oauth/token/create?scopes[]=challenge:write&scopes[]=challenge:read&scopes[]=board:play" target="_blank">Generate a personal access token.</a>
         </fieldset>
       </form><br>
       <form method="post" action="/lichess-challenge">
         <fieldset><legend>Games</legend>
-          <label style="width: 9ch;">Limit</label>&nbsp;<input type="number" name="clock-limit" min="10" max="90" size="5">&nbsp;<label>minutes</label><br>
-          <label style="width: 9ch;">Increment</label>&nbsp;<input type="number" name="clock-increment" min="0" max="30" size="5">&nbsp;<label>seconds</label><br>
+          <label style="width: 9ch;">Limit</label>&nbsp;<input type="number" name="clock-limit" min="10" max="90" size="5" required>&nbsp;<label>minutes</label><br>
+          <label style="width: 9ch;">Increment</label>&nbsp;<input type="number" name="clock-increment" min="0" max="30" size="5" required>&nbsp;<label>seconds</label><br>
           <label style="width: 9ch;">Opponent</label>&nbsp;<input type="text" name="opponent" placeholder="(optional)"><br>
           <label style="width: 9ch;">Mode</label>&nbsp;
           <input type="radio" name="mode" id="rated" value="rated" disabled><label for="rated">Rated</label>
@@ -70,13 +70,13 @@ form input { margin: 2px auto;}
     <div class="panel">
       <form method="post" action="/wifi-cfg">
         <fieldset><legend>Configure Wi-Fi</legend>
-          <label style="width: 8ch;">SSID</label>&nbsp;<input type="text" name="ssid"><br>
-          <label style="width: 8ch;">Password</label>&nbsp;<input type="text" name="passwd"><br>
+          <label style="width: 8ch;">SSID</label>&nbsp;<input type="text" name="ssid" required><br>
+          <label style="width: 8ch;">Password</label>&nbsp;<input type="text" name="passwd" required><br>
           <input type="submit" style="margin: 3px 10.5ch -2px; padding: 0 2ch;" value="Add">
         </fieldset>
       </form><br><br>
       <form method='POST' action='/update' enctype='multipart/form-data'>
-        <fieldset><legend>FW Update</legend><input type='file' name='update' accept=".bin"><input type='submit' value='Update'></fieldset>
+        <fieldset><legend>FW Update</legend><input type='file' name='update' accept=".bin" required><input type='submit' value='Update'></fieldset>
       </form><br>
       <form method="post" action="/reset">
         <fieldset><legend>Reset</legend>
@@ -89,14 +89,24 @@ form input { margin: 2px auto;}
 
   <script type="text/javascript">
 (function() {
+  const txt_username = document.getElementById("txt-username");
   const txt_ver = document.getElementById("txt-ver");
-  fetch("/version").then(function(rsp) {
+  const txt_pgn = document.getElementById("txt-pgn");
+  fetch("/username").then(function(rsp) {
     rsp.text().then(function (txt) {
-      txt_ver.innerText = "FW v" + txt;
+      if (txt) {
+        txt_username.innerText = "@" + txt; txt_username.setAttribute("href", "https://lichess.org/@/" + txt);
+      } else {
+        txt_username.innerText = "unknown Lichess account"; txt_username.style.color = "#e00";
+      }
     });
-  }).catch(function(err){
-    console.log(err);
-  });
+  }).catch(function(err){ console.log(err); });
+  fetch("/version").then(function(rsp) {
+    rsp.text().then(function (txt) { txt_ver.innerText = "FW v" + txt; });
+  }).catch(function(err){ console.log(err); });
+  fetch("/pgn").then(function(rsp) {
+    rsp.text().then(function (txt) { txt_pgn.innerText = txt ? txt : "..."; });
+  }).catch(function(err){ console.log(err); });
 })();
   </script>
 </body>

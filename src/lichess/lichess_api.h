@@ -53,6 +53,7 @@ typedef enum
  * Public Function Prototypes
  */
 void init(void);
+bool get_username(String &name);
 
 
 /*
