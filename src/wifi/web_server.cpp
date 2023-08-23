@@ -24,7 +24,7 @@ static void handleRoot()
     server.send(200, "text/html", index_html);
 }
 
-static void handlePostToken()
+static void handleSetToken()
 {
     String token = server.arg("token");
     LOGD("token: %s", token.c_str());
@@ -39,7 +39,7 @@ static void handlePostToken()
     }
 }
 
-static void handlePostChallenge()
+static void handleSetGameOptions()
 {
     String limit     = server.arg("clock-limit");
     String increment = server.arg("clock-increment");
@@ -48,7 +48,9 @@ static void handlePostChallenge()
     LOGD("timecontrol: %d+%d, opponent: %s",
         limit.toInt(), increment.toInt(), opponent.c_str());
 
-    server.send(200, "text/plain", "to do");
+    bool b_status = lichess::set_game_options(opponent, limit.toInt() * 60, increment.toInt());
+
+    server.send(b_status ? 200 : 400, "text/plain", b_status ? "ok" : "failed");
 }
 
 static void handlePostWiFiCfg()
@@ -107,8 +109,19 @@ void serverSetup(void)
         server.send(chess::get_pgn(pgn) ? 200 : 404, "text/plain", pgn.isEmpty() ? "..." : pgn);
     });
 
-    server.on("/lichess-token", HTTP_POST, handlePostToken);
-    server.on("/lichess-challenge", HTTP_POST, handlePostChallenge);
+    server.on("/lichess-game", HTTP_GET, []() {
+        String opponent;
+        uint16_t u16_limit;
+        uint8_t u8_increment;
+        lichess::get_game_options(opponent, u16_limit, u8_increment);
+        char rsp[128];
+        snprintf(rsp, sizeof(rsp), "{\"opponent\": \"%s\", \"limit\":%u, \"increment\": %u}",
+                opponent.c_str(), u16_limit / 60, u8_increment);
+        server.send(200, "application/json", rsp);
+    });
+
+    server.on("/lichess-token", HTTP_POST, handleSetToken);
+    server.on("/lichess-game", HTTP_POST, handleSetGameOptions);
     server.on("/wifi-cfg", HTTP_POST, handlePostWiFiCfg);
     server.on("/reset", HTTP_POST, handlePostReset);
 

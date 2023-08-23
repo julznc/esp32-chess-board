@@ -48,15 +48,15 @@ form input { margin: 2px auto;}
     <div class="panel">
       <form method="post" action="/lichess-token">
         <fieldset><legend>Access Token</legend>
-          <input type="text" name="token" size="32" minlength="20" required><input type="submit" value="Set"><br><br>
+          <input type="text" name="token" size="32" minlength="20" placeholder="********" required><input type="submit" value="Set"><br><br>
           <a href="https://lichess.org/account/oauth/token/create?scopes[]=challenge:write&scopes[]=challenge:read&scopes[]=board:play" target="_blank">Generate a personal access token.</a>
         </fieldset>
       </form><br>
-      <form method="post" action="/lichess-challenge">
+      <form method="post" action="/lichess-game">
         <fieldset><legend>Games</legend>
           <label style="width: 9ch;">Limit</label>&nbsp;<input type="number" name="clock-limit" min="10" max="90" size="5" required>&nbsp;<label>minutes</label><br>
           <label style="width: 9ch;">Increment</label>&nbsp;<input type="number" name="clock-increment" min="0" max="30" size="5" required>&nbsp;<label>seconds</label><br>
-          <label style="width: 9ch;">Opponent</label>&nbsp;<input type="text" name="opponent" placeholder="(optional)"><br>
+          <label style="width: 9ch;">Opponent</label>&nbsp;<input type="text" name="opponent" placeholder="(optional)">&nbsp;<label><a href="https://lichess.org/player/bots" target="_blank">bots</a></label><br>
           <label style="width: 9ch;">Mode</label>&nbsp;
           <input type="radio" name="mode" id="rated" value="rated" disabled><label for="rated">Rated</label>
           <input type="radio" name="mode" id="casual" value="casual" disabled checked><label for="casual">Casual</label><br>
@@ -89,11 +89,9 @@ form input { margin: 2px auto;}
 
   <script type="text/javascript">
 (function() {
-  const txt_username = document.getElementById("txt-username");
-  const txt_ver = document.getElementById("txt-ver");
-  const txt_pgn = document.getElementById("txt-pgn");
   fetch("/username").then(function(rsp) {
     rsp.text().then(function (txt) {
+      const txt_username = document.getElementById("txt-username");
       if (txt.length >= 3) {
         txt_username.innerText = "@" + txt; txt_username.setAttribute("href", "https://lichess.org/@/" + txt);
       } else {
@@ -102,10 +100,17 @@ form input { margin: 2px auto;}
     });
   }).catch(function(err){ console.log(err); });
   fetch("/version").then(function(rsp) {
-    rsp.text().then(function (txt) { txt_ver.innerText = "FW v" + txt; });
+    rsp.text().then(function (txt) { document.getElementById("txt-ver").innerText = "FW v" + txt; });
   }).catch(function(err){ console.log(err); });
   fetch("/pgn").then(function(rsp) {
-    rsp.text().then(function (txt) { txt_pgn.innerText = txt; });
+    rsp.text().then(function (txt) { document.getElementById("txt-pgn").innerText = txt; });
+  }).catch(function(err){ console.log(err); });
+  fetch("/lichess-game").then(function(rsp) {
+    rsp.json().then(function (cfg) {
+      document.querySelector('input[name="clock-limit"]').value = cfg.limit;
+      document.querySelector('input[name="clock-increment"]').value = cfg.increment;
+      document.querySelector('input[name="opponent"]').value = cfg.opponent;
+    });
   }).catch(function(err){ console.log(err); });
 })();
   </script>

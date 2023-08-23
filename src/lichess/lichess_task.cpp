@@ -524,10 +524,34 @@ size_t set_token(const char *token)
     return len;
 }
 
-void get_token(String &token)
+bool get_token(String &token)
 {
     token = configs.getString("token");
     //LOGD("token = %s", token.c_str());
+    return token.length() > 0;
+}
+
+bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clock_increment)
+{
+    if ((configs.putString("opponent", opponent) < opponent.length()) ||
+        (configs.putUShort("clock_limit", u16_clock_limit) < sizeof(uint16_t)) ||
+        (configs.putUChar("clock_increment", u8_clock_increment) < sizeof(uint8_t)))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_clock_increment)
+{
+    // default to maia9 bot
+    opponent = configs.getString("opponent", "maia9");
+    // default to 15+10
+    u16_clock_limit = configs.getUShort("clock_limit", 15U * 60);
+    u8_clock_increment = configs.getUChar("clock_increment", 10);
+
+    return true;
 }
 
 } // namespace lichess
