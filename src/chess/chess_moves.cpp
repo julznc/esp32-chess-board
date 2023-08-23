@@ -165,7 +165,7 @@ void make_move(game_st *p_game, const move_st *move)
 
         /* if pawn promotion, replace with new piece */
         if (move->flags & BIT_PROMOTION) {
-            board[move->to] = MAKE_PIECE(us, QUEEN);
+            board[move->to] = MAKE_PIECE(us, move->promoted ? move->promoted : QUEEN);
         }
     }
 
@@ -431,7 +431,12 @@ bool move_to_san(move_st *list, const move_st *p_move, char *san_buf, uint8_t bu
             *san++ = '0' + 8 - RANK(p_move->from);
         }
 
-        snprintf(san, buf_sz - 4, "%c%u", ALGEBRAIC(p_move->to));
+        san += snprintf(san, buf_sz - 4, "%c%u", ALGEBRAIC(p_move->to));
+    }
+
+    if (p_move->flags & BIT_PROMOTION) {
+        *san++ = '=';
+        *san++ = toupper(PIECE_TYPE(p_move->promoted));
     }
 
     return true;

@@ -359,9 +359,16 @@ static inline void display_stats(const char *last_san)
 
 static inline void do_move(move_st *list, move_st *move)
 {
-    char san_buf[16];
+    char san_buf[16] = {0, };
 
     lock();
+
+    if (move->flags & BIT_PROMOTION) {
+        // set actual promoted piece
+        move->promoted = PIECE_TYPE(pu8_pieces[SQUARE_TO_IDX(move->to)]);
+        LOGD("promote to %c", toupper(move->promoted));
+        s_game.board[move->to] = move->promoted;
+    }
 
     make_move(&s_game, move);
     move_to_san(list, move, san_buf, sizeof(san_buf) - 1);
@@ -369,15 +376,6 @@ static inline void do_move(move_st *list, move_st *move)
     memcpy(au8_prev_pieces, pu8_pieces, sizeof(au8_prev_pieces));
     memcpy(&last_move, move, sizeof(move_st));
     memset(&pending_move, 0, sizeof(move_st));
-
-    if (move->flags & BIT_PROMOTION) {
-        // set actual promoted piece
-        uint8_t promoted = pu8_pieces[SQUARE_TO_IDX(move->to)];
-        //LOGD("change %02x to %02x", s_game.board[move->to], promoted);
-        char ch = PIECE_TYPE(promoted);
-        s_game.board[move->to] = promoted;
-        snprintf(&san_buf[strlen(san_buf)], sizeof(san_buf) - 4, "=%c", toupper(ch));
-    }
 
     unlock();
 
@@ -443,6 +441,7 @@ void loop(uint32_t ms_last_changed)
         }
     }
 
+    s_game.stats.valid = false;
     if (false == b_valid_posision)
     {
         if (b_skip_start_fen || check_start_fen())
@@ -454,6 +453,7 @@ void loop(uint32_t ms_last_changed)
     }
     else if (0 == memcmp(au8_prev_pieces, pu8_pieces, sizeof(au8_prev_pieces)))
     {
+        s_game.stats.valid = true;
         //LOGD("no change yet");
         if ((0 == last_move.piece) && (0 == pending_move.piece)) {
             show_turn();
@@ -476,6 +476,7 @@ void loop(uint32_t ms_last_changed)
         if (VALID_MOVE())
         {
             do_move(moves_list, &move);
+            s_game.stats.valid = true;
         }
         // lift a piece ?
         else if (0 != (u8_squares_count = hint_moves(&s_game, moves_list, pu8_pieces, au8_allowed_squares, sizeof(au8_allowed_squares))))
@@ -505,6 +506,7 @@ void loop(uint32_t ms_last_changed)
                 {
                     LOGD("continue move %c%u%c%u", ALGEBRAIC(move.from), ALGEBRAIC(move.to));
                     do_move(moves_list, &move);
+                    s_game.stats.valid = true;
                 }
                 else
                 {
@@ -627,7 +629,10 @@ const char *piece_to_string(uint8_t u7_type)
 const stats_st *get_position(String &fen /*current position*/, String &move /*last move*/)
 {
     lock();
-    fen = generate_fen(&s_game);
+    if (s_game.stats.valid)
+    {
+        fen = generate_fen(&s_game);
+    }
     unlock();
 
     (void)get_last_move(move);
@@ -638,7 +643,7 @@ bool get_position(String &fen)
 {
     bool b_status = false;
     lock();
-    b_status = b_valid_posision;
+    b_status = s_game.stats.valid;
     if (b_status)
     {
         fen = generate_fen(&s_game);
@@ -663,7 +668,7 @@ bool get_last_move(String &move)
         move += (char)('a' + FILE(last_move.to));
         move += (char)('0' + 8 - RANK(last_move.to));
         if (last_move.flags & BIT_PROMOTION) {
-            move += (char)PIECE_TYPE(s_game.board[last_move.to]);
+            move += (char)PIECE_TYPE(last_move.promoted);
         }
         b_status = true;
     }

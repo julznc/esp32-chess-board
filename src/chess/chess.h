@@ -79,6 +79,7 @@ typedef struct move {
     uint8_t piece;
     uint8_t flags;
     uint8_t captured;
+    uint8_t promoted;
 } move_st;
 
 typedef struct {
@@ -88,6 +89,7 @@ typedef struct {
     uint16_t half_moves;
     uint16_t move_number;
     uint8_t  kings[2];      // kings position
+    uint8_t  valid;         // (bool) false = busy checking
 } stats_st;
 
 typedef struct record {
