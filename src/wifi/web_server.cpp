@@ -21,6 +21,37 @@ static void handleRoot()
     server.send(200, "text/html", index_html);
 }
 
+static void handleGetUsername()
+{
+    server.send(200, "text/plain", "to do");
+}
+
+static void handleGetPgn()
+{
+    server.send(200, "text/plain", "to do");
+}
+
+static void handlePostToken()
+{
+    //server.send(200, "text/plain", "to do");
+    server.send(302, "text/html", "<head><meta http-equiv=\"refresh\" content=\"0;url=/\"></head>");
+}
+
+static void handlePostChallenge()
+{
+    server.send(200, "text/plain", "to do");
+}
+
+static void handlePostWiFiCfg()
+{
+    server.send(200, "text/plain", "to do");
+}
+
+static void handlePostReset()
+{
+    server.send(200, "text/plain", "to do");
+}
+
 static void handleNotFound()
 {
     LOGW("%s %s", (server.method() == HTTP_GET) ? "get" : "post", server.uri().c_str());
@@ -38,6 +69,13 @@ void serverSetup(void)
     server.on("/version", HTTP_GET, []() {
         server.send(200, "text/plain", K_APP_VERSION);
     });
+
+    server.on("/username", HTTP_GET, handleGetUsername);
+    server.on("/pgn", HTTP_GET, handleGetPgn);
+    server.on("/lichess-token", HTTP_POST, handlePostToken);
+    server.on("/lichess-challenge", HTTP_POST, handlePostChallenge);
+    server.on("/wifi-cfg", HTTP_POST, handlePostWiFiCfg);
+    server.on("/reset", HTTP_POST, handlePostReset);
 
     server.on("/update", HTTP_POST, []() {
         //LOGD("update done");
