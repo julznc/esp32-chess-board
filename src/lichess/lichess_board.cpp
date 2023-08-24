@@ -117,6 +117,8 @@ static inline void parse_game_state_event(JsonObject &obj, game_st *ps_game, Str
     ps_game->u32_winc   = obj["winc"].as<uint32_t>();
     ps_game->u32_binc   = obj["binc"].as<uint32_t>();
 
+    strncpy(ps_game->ac_state, status.c_str(), sizeof(ps_game->ac_state) - 1);
+
     //LOGD("(%s) moves: \"%s\"", status.c_str(), moves.c_str());
 
     ps_game->e_state = get_state(status);

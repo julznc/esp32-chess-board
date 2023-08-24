@@ -18,6 +18,7 @@ static ApiClient        main_client;    // main connection (non-stream)
 ApiClient::SecClient::SecClient() : WiFiClientSecure()
 {
     _timeout = 20;
+    sslclient->handshake_timeout = 20000;
 
     // to do: load from preferences
     _CA_cert = LICHESS_ORG_PEM; // setCACert()

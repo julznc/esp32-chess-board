@@ -374,11 +374,23 @@ static void taskClient(void *)
             else if (s_current_game.e_state > GAME_STATE_STARTED)
             {
                 LOGD("end game stream");
+                SHOW_OPPONENT("finish-%s", s_current_game.ac_state);
                 stream_client.end(true);
                 memset(&s_current_game, 0, sizeof(s_current_game));
                 CLEAR_BOTTOM_MENU();
+              #if 0
                 delay(1000);
                 e_state = CLIENT_STATE_INIT;
+              #elif 1 // halt task
+                SET_BOTTOM_MENU("            Restart->");
+                while (1) {
+                    WDT_FEED();
+                    if (RIGHT_BTN.shortPressed()) {
+                        ESP.restart();
+                    }
+                    delay(1000);
+                }
+              #endif
             }
             else
             {
