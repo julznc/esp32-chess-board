@@ -136,26 +136,35 @@ bool create_challenge(const challenge_st *ps_challenge, const char *fen)
 
     endpoint += ps_challenge->ac_user;
 
-    if (0 == strcmp(ps_challenge->ac_user, "ai")) {
+    if (ps_challenge->e_player <= PLAYER_AI_LEVEL_HIGH)
+    {
         payload += "level=";
-        payload += ps_challenge->u8_level;
-    } else {
-        payload += ps_challenge->b_rated ? "&rated=true" : "&rated=false";
+        payload += (PLAYER_AI_LEVEL_HIGH == ps_challenge->e_player) ? (8) : ((PLAYER_AI_LEVEL_MEDIUM == ps_challenge->e_player) ? (5) : (2));
+        payload += "&fen=";
+        payload += fen;
+    }
+    else if (ps_challenge->e_player == PLAYER_CUSTOM)
+    {
+        payload += ps_challenge->b_rated ? "rated=true" : "rated=false";
         payload += "&keepAliveStream=false";
         payload += "&rules=noRematch,noClaimWin,noEarlyDraw";
     }
+    else
+    {
+        LOGW("to do: create seek (%s)", ps_challenge->ac_user);
+        delay(2000);
+        return false;
+    }
+
     payload += "&clock.limit=";
     payload += ps_challenge->u16_clock_limit;
     payload += "&clock.increment=";
     payload += ps_challenge->u8_clock_increment;
     payload += ps_challenge->b_color ? "&color=white" : "&color=black";
     payload += "&variant=standard";
-    payload += "&fen=";
-    payload += fen;
 
     //payload.replace(" ", "%20");
-    LOGD("play as %s vs %s:\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, payload.c_str());
-
+    LOGD("play as %s vs %s: %s\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, endpoint.c_str(), payload.c_str());
     return api_post(endpoint.c_str(), payload, _rsp, true);
 }
 

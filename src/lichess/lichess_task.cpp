@@ -251,24 +251,49 @@ static int poll_game_state()
     return result;
 }
 
+static inline const char *get_player_name(challenge_st *ps_challenge)
+{
+    String opponent;
+    const char *name = "";
+
+    strncpy(ps_challenge->ac_user, "ai", sizeof(ps_challenge->ac_user));
+
+    switch (ps_challenge->e_player)
+    {
+    case PLAYER_AI_LEVEL_LOW:       name = "Stockfish level 2"; break;
+    case PLAYER_AI_LEVEL_MEDIUM:    name = "Stockfish level 5"; break;
+    case PLAYER_AI_LEVEL_HIGH:      name = "Stockfish level 8"; break;
+    case PLAYER_CUSTOM:
+        opponent = configs.getString("opponent", CHALLENGE_DEFAULT_OPPONENT_NAME);
+        strncpy(ps_challenge->ac_user, opponent.c_str(), sizeof(ps_challenge->ac_user));
+        name = ps_challenge->ac_user;
+        break;
+    case PLAYER_RANDOM_SEEK:
+        strncpy(ps_challenge->ac_user, "random", sizeof(ps_challenge->ac_user));
+        name = "random opponent";
+        break;
+    }
+
+    return name;
+}
+
 static void taskClient(void *)
 {
-    String          fen, prev_fen;
-    String          last_move, queued_move;
-    challenge_st    s_challenge; // outgoing challenge
-    const chess::stats_st *fen_stats = NULL;
-    bool            b_level_adjusted = false;
-    uint8_t         u8_error_count   = 0;
+    challenge_st            s_challenge; // outgoing challenge
+    const chess::stats_st  *fen_stats   = NULL;
+    String      fen, prev_fen;
+    String      last_move, queued_move;
+    bool        b_opponent_changed = false;
+    uint8_t     u8_error_count   = 0;
 
     WDT_WATCH(NULL);
 
     delay(2500UL);
 
-    strncpy(s_challenge.ac_user, "ai", sizeof(s_challenge.ac_user) - 1);
-    s_challenge.u8_level            = 1;
+    s_challenge.e_player            = CHALLENGE_DEFAULT_OPPONENT;
     s_challenge.b_rated             = false;
-    s_challenge.u16_clock_limit     = 65 * 60;
-    s_challenge.u8_clock_increment  = 30;
+    s_challenge.u16_clock_limit     = configs.getUShort("clock_limit", CHALLENGE_DEFAULT_LIMIT);
+    s_challenge.u8_clock_increment  = configs.getUChar("clock_increment", CHALLENGE_DEFAULT_INCREMENT);
 
     for (;;)
     {
@@ -365,6 +390,10 @@ static void taskClient(void *)
             {
                 if (chess::get_position(fen))
                 {
+                    if (fen != START_FEN) {
+                        s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
+                    }
+                    SHOW_OPPONENT(get_player_name(&s_challenge));
                     SET_BOTTOM_MSG ("Play from position ?");
                     SET_BOTTOM_MENU("<-Black       White->");
                 }
@@ -430,36 +459,43 @@ static void taskClient(void *)
             }
             else if (!fen.isEmpty())
             {
-                //
                 if (RIGHT_BTN.pressedDuration() >= 1500UL) {
                     RIGHT_BTN.resetCount();
-                    if (s_challenge.u8_level < 8) {
-                        s_challenge.u8_level++;
+                    if (s_challenge.e_player < PLAYER_LAST_IDX) {
+                        s_challenge.e_player++;
+                        if ((s_challenge.e_player > PLAYER_AI_LEVEL_HIGH) && (fen != START_FEN)) {
+                            // allow custom position on AI opponent only
+                            s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
+                        }
                     }
-                    SHOW_OPPONENT("Stockfish level %u", s_challenge.u8_level);
-                    b_level_adjusted = true;
+                    SHOW_OPPONENT(get_player_name(&s_challenge));
+                    b_opponent_changed = true;
                 }
                 else if (LEFT_BTN.pressedDuration() >= 1500UL) {
                     LEFT_BTN.resetCount();
-                    if (s_challenge.u8_level > 1) {
-                        s_challenge.u8_level--;
+                    if (s_challenge.e_player > PLAYER_FIRST_IDX) {
+                        s_challenge.e_player--;
                     }
-                    SHOW_OPPONENT("Stockfish level %u", s_challenge.u8_level);
-                    b_level_adjusted = true;
+                    SHOW_OPPONENT(get_player_name(&s_challenge));
+                    b_opponent_changed = true;
                 }
-                else if (b_level_adjusted) {
-                    delay(1500UL);
-                    b_level_adjusted = false;
+                else if (b_opponent_changed) {
+                    delay(2000UL);
+                    b_opponent_changed = false;
                 }
                 else if (RIGHT_BTN.shortPressed()) {
                     CLEAR_BOTTOM_MENU();
                     s_challenge.b_color = true;
-                    create_challenge(&s_challenge, fen.c_str());
+                    if (create_challenge(&s_challenge, fen.c_str())) {
+                        SET_BOTTOM_MSG("wait for opponent...");
+                    }
                 }
                 else if (LEFT_BTN.shortPressed()) {
                     CLEAR_BOTTOM_MENU();
                     s_challenge.b_color = false;
-                    create_challenge(&s_challenge, fen.c_str());
+                    if (create_challenge(&s_challenge, fen.c_str())) {
+                        SET_BOTTOM_MSG("wait for opponent...");
+                    }
                 }
             }
             e_state = CLIENT_STATE_CHECK_EVENTS;
@@ -546,10 +582,10 @@ bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clo
 bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_clock_increment)
 {
     // default to maia9 bot
-    opponent = configs.getString("opponent", "maia9");
+    opponent = configs.getString("opponent", CHALLENGE_DEFAULT_OPPONENT_NAME);
     // default to 15+10
-    u16_clock_limit = configs.getUShort("clock_limit", 15U * 60);
-    u8_clock_increment = configs.getUChar("clock_increment", 10);
+    u16_clock_limit = configs.getUShort("clock_limit", CHALLENGE_DEFAULT_LIMIT);
+    u8_clock_increment = configs.getUChar("clock_increment", CHALLENGE_DEFAULT_INCREMENT);
 
     return true;
 }
