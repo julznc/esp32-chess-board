@@ -129,6 +129,23 @@ bool decline_challenge(const char *challenge_id, const char *reason)
     return api_post(endpoint.c_str(), payload, _rsp, true);
 }
 
+bool create_seek(const challenge_st *ps_challenge)
+{
+    String endpoint = "/api/board/seek";
+    String payload  = "";
+
+    payload += ps_challenge->b_rated ? "rated=true" : "rated=false";
+    payload += "&time=";
+    payload += ps_challenge->u16_clock_limit / 60;  // in minutes
+    payload += "&increment=";
+    payload += ps_challenge->u8_clock_increment;    // in seconds
+    payload += "&variant=standard";
+    payload += ps_challenge->b_color ? "&color=white" : "&color=black";
+
+    LOGD("play as %s vs %s: %s\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, endpoint.c_str(), payload.c_str());
+    return api_post(endpoint.c_str(), payload, _rsp, true);
+}
+
 bool create_challenge(const challenge_st *ps_challenge, const char *fen)
 {
     String endpoint = "/api/challenge/";
@@ -151,9 +168,7 @@ bool create_challenge(const challenge_st *ps_challenge, const char *fen)
     }
     else
     {
-        LOGW("to do: create seek (%s)", ps_challenge->ac_user);
-        delay(2000);
-        return false;
+        return create_seek(ps_challenge);
     }
 
     payload += "&clock.limit=";
