@@ -121,6 +121,7 @@ static int poll_events()
                     DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
                     if ((GAME_STATE_STARTED == result) && s_current_game.ac_id[0])
                     {
+                        chess::continue_game(s_current_game.ac_fen);
                         str_current_moves = ""; // clear starting moves
                         SHOW_OPPONENT("%.17s %c", s_current_game.ac_opponent, s_current_game.b_color ? 'B' : 'W');
                         SET_BOTTOM_MENU("<-Abort      Resign->");
@@ -386,7 +387,7 @@ static void taskClient(void *)
             break;
 
         case CLIENT_STATE_CHECK_BOARD:
-            if (fen.isEmpty()) // if not yet started
+            if (fen.isEmpty() && !s_current_game.ac_id[0]) // if not yet started
             {
                 if (chess::get_position(fen))
                 {

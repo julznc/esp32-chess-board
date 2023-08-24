@@ -39,6 +39,7 @@ typedef struct
     char            ac_id[16];      // for url
     char            ac_opponent[32];
     char            ac_lastmove[8];
+    char            ac_fen[80];
     game_state_et   e_state;
     uint32_t        u32_wtime;
     uint32_t        u32_btime;

@@ -31,7 +31,8 @@ typedef enum {
 #define VALID_PIECE(u7_type)            ((chess::PAWN==u7_type) || (chess::KNIGHT==u7_type) || (chess::BISHOP==u7_type) || \
                                          (chess::ROOK==u7_type) || (chess::QUEEN==u7_type)  || (chess::KING==u7_type))
 
-#define START_FEN   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+#define START_FEN                       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+#define IS_START_FEN(fen)               (0 == strncmp(fen, START_FEN, 43))
 
 typedef enum {
     a8 =   0, b8 =   1, c8 =   2, d8 =   3, e8 =   4, f8 =   5, g8 =   6, h8 =   7,
@@ -132,6 +133,7 @@ const stats_st *get_position(String &fen /*current position*/, String &move /*la
 bool get_position(String &fen);
 bool get_last_move(String &move /*uci*/);
 bool get_pgn(String &pgn);
+bool continue_game(const char *expected_fen); // continue game from position
 bool queue_move(const String &move);
 
 

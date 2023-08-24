@@ -361,8 +361,6 @@ static inline void do_move(move_st *list, move_st *move)
 {
     char san_buf[16] = {0, };
 
-    lock();
-
     if (move->flags & BIT_PROMOTION) {
         // set actual promoted piece
         move->promoted = PIECE_TYPE(pu8_pieces[SQUARE_TO_IDX(move->to)]);
@@ -376,8 +374,6 @@ static inline void do_move(move_st *list, move_st *move)
     memcpy(au8_prev_pieces, pu8_pieces, sizeof(au8_prev_pieces));
     memcpy(&last_move, move, sizeof(move_st));
     memset(&pending_move, 0, sizeof(move_st));
-
-    unlock();
 
     move_st *next_moves = generate_moves(&s_game);
     if (next_moves) {
@@ -426,6 +422,8 @@ void loop(uint32_t ms_last_changed)
     uint8_t u8_squares_count;
 
     ui::leds::clear();
+
+    lock();
 
     if (!s_game.history) // if no moves yet
     {
@@ -498,10 +496,8 @@ void loop(uint32_t ms_last_changed)
         else
         {
             // is continuation ?
-            lock();
             if (undo_move(&s_game, &move))
             {
-                unlock();
                 clear_moves(&moves_list);
                 moves_list = generate_moves(&s_game);
                 if (VALID_MOVE())
@@ -515,9 +511,7 @@ void loop(uint32_t ms_last_changed)
                     //LOGW("continuation not found");
                     show_diff(au8_prev_pieces);
                     ui::leds::update();
-                    lock();
                     make_move(&s_game, &move); // redo last
-                    unlock();
                 }
             }
             else
@@ -526,11 +520,12 @@ void loop(uint32_t ms_last_changed)
                 show_diff(au8_prev_pieces);
                 ui::leds::update();
             }
-            unlock();
         }
 
         clear_moves(&moves_list);
     }
+
+    unlock();
 }
 
 const char *generate_fen(const game_st *p_game)
@@ -701,6 +696,36 @@ bool get_pgn(String &pgn)
 
     unlock();
     return true;
+}
+
+bool continue_game(const char *expected_fen)
+{
+    char   *tok = strchr(expected_fen, ' ');
+    int     len = tok ? (int)(tok - expected_fen) : 0;
+    bool    b_status = false;
+
+    lock();
+
+    if (false == b_valid_posision)
+    {
+        memcpy(au8_prev_pieces, pu8_pieces, sizeof(au8_prev_pieces));
+        b_valid_posision = load_position(pu8_pieces, true);
+        b_skip_start_fen = b_valid_posision;
+    }
+
+    s_game.stats.turn = (NULL != strstr(expected_fen, " w "));
+    generate_fen(&s_game);
+    b_status = len > 0 ? (0 == strncmp(ac_fen_buf, expected_fen, len)) : (false);
+    LOGD("check %d fen = %d (turn %d)\r\n%s\r\n%s", len, b_status, s_game.stats.turn, ac_fen_buf, expected_fen);
+
+    if (!b_status && !IS_START_FEN(expected_fen))
+    {
+        //LOGD("hmmm previous/queued move is not done yet?");
+        s_game.stats.turn = SWAP_COLOR(s_game.stats.turn); // toggle turn
+    }
+
+    unlock();
+    return b_status;
 }
 
 bool queue_move(const String &move)

@@ -85,10 +85,12 @@ int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/)
                 JsonObject  opponent    = obj["opponent"].as<JsonObject>();
                 const char *opp_name    = opponent["username"].as<const char*>();
                 const char *color       = obj["color"].as<const char*>();
+                const char *fen         = obj["fen"].as<const char*>();
                 const char *lastmove    = obj["lastMove"].as<const char*>();
                 const char *status_name = status["name"].as<const char*>();
 
                 strncpy(ps_game->ac_id, id, sizeof(ps_game->ac_id) - 1);
+                strncpy(ps_game->ac_fen, fen, sizeof(ps_game->ac_fen) - 1);
                 strncpy(ps_game->ac_opponent, opp_name, sizeof(ps_game->ac_opponent) - 1);
                 strncpy(ps_game->ac_lastmove, lastmove, sizeof(ps_game->ac_lastmove) - 1);
                 LOGI("%s %s", status_name, ps_game->ac_id);
