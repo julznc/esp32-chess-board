@@ -471,7 +471,9 @@ void loop(uint32_t ms_last_changed)
         move_st *moves_list = generate_moves(&s_game);
 
         // exact move with blanking
-  #define VALID_MOVE()      ((millis() - ms_last_changed > 780) && find_move(&s_game, moves_list, pu8_pieces, &move))
+  #define VALID_MOVE()      ((true == find_move(&s_game, moves_list, pu8_pieces, &move)) && \
+                             ((millis() - ms_last_changed > 780) ||                         \
+                             ((move.from == pending_move.from) && (move.to == pending_move.to))))
 
         if (VALID_MOVE())
         {

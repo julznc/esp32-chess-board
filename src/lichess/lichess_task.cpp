@@ -185,7 +185,8 @@ static inline void display_clock(bool b_turn, bool b_show)
         wsecs = wsecs % 60;
         bsecs = bsecs % 60;
         //" 000:00       000:00 "
-        DISPLAY_TEXT1(0, 45, " %3u:%02u       %3u:%02u ", bmins, bsecs, wmins, wsecs);
+        //DISPLAY_TEXT1(0, 45, " %3u:%02u       %3u:%02u ", bmins, bsecs, wmins, wsecs);
+        DISPLAY_TEXT1(0, 45, "%3u:%02u  %-5s %3u:%02u ", bmins, bsecs, str_last_move.c_str(), wmins, wsecs);
     }
 
     if (b_turn) {
@@ -253,7 +254,7 @@ static int poll_game_state()
 static void taskClient(void *)
 {
     String          fen, prev_fen;
-    String          last_move, queue_move;
+    String          last_move, queued_move;
     challenge_st    s_challenge; // outgoing challenge
     const chess::stats_st *fen_stats = NULL;
     bool            b_level_adjusted = false;
@@ -371,10 +372,11 @@ static void taskClient(void *)
             else if (GAME_STATE_STARTED == s_current_game.e_state) // if has on-going game
             {
                 fen_stats = chess::get_position(fen, last_move);
+                bool b_turn = fen.indexOf('w') > 0;
 
                 if (prev_fen != fen)
                 {
-                    if (!last_move.isEmpty() && (last_move != queue_move) && (fen_stats->turn != s_current_game.b_color))
+                    if (!last_move.isEmpty() && (b_turn != s_current_game.b_color))
                     {
                         if (game_move(s_current_game.ac_id, last_move.c_str()))
                         {
@@ -384,17 +386,15 @@ static void taskClient(void *)
                     }
                 }
 
-                if (!str_last_move.isEmpty() && (str_last_move != queue_move))
+                if (!str_last_move.isEmpty() && (str_last_move != last_move))
                 {
-                    //LOGD("need queue %s? turn %d - %d", str_last_move.c_str(), fen_stats->turn, s_current_game.b_color);
-                    queue_move = str_last_move;
-                    if (last_move != queue_move)
+                    if ((queued_move != str_last_move) && chess::queue_move(str_last_move))
                     {
-                        chess::queue_move(queue_move);
+                        queued_move = str_last_move;
                     }
                 }
 
-                display_clock(s_current_game.b_turn, true);
+                display_clock(b_turn, true);
             }
             else if (s_current_game.e_state > GAME_STATE_STARTED)
             {
@@ -402,7 +402,7 @@ static void taskClient(void *)
                 fen = "";
                 prev_fen = "";
                 last_move = "";
-                queue_move = "";
+                queued_move = "";
             }
             e_state = CLIENT_STATE_IDLE;
             break;
