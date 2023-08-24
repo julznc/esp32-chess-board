@@ -42,8 +42,8 @@ typedef enum
     PLAYER_AI_LEVEL_LOW = 0,    // Fairy-Stockfish 14 Level 2
     PLAYER_AI_LEVEL_MEDIUM,     // Fairy-Stockfish 14 Level 5
     PLAYER_AI_LEVEL_HIGH,       // Fairy-Stockfish 14 Level 8 // max
-#if 0 // https://lichess.org/player/bots
     PLAYER_BOT_MAIA9,           // https://lichess.org/@/maia9
+#if 0 // https://lichess.org/player/bots
     PLAYER_BOT_HUMAIA_S,        // https://lichess.org/@/Humaia-Strong
     PLAYER_BOT_OPENINGS,        // https://lichess.org/@/OpeningsBot  -- up to 20+10 only
     PLAYER_BOT_FIREFISH,        // https://lichess.org/@/FireFishBOT_v2
@@ -60,7 +60,7 @@ typedef enum
 
 
 #define CHALLENGE_DEFAULT_OPPONENT          PLAYER_CUSTOM
-#define CHALLENGE_DEFAULT_OPPONENT_NAME     "maia9"
+#define CHALLENGE_DEFAULT_OPPONENT_NAME     "maia5"
 #define CHALLENGE_DEFAULT_LIMIT             (15U * 60)
 #define CHALLENGE_DEFAULT_INCREMENT         (10)
 

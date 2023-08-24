@@ -160,7 +160,7 @@ bool create_challenge(const challenge_st *ps_challenge, const char *fen)
         payload += "&fen=";
         payload += fen;
     }
-    else if (ps_challenge->e_player == PLAYER_CUSTOM)
+    else if ((PLAYER_BOT_MAIA9 == ps_challenge->e_player) || (PLAYER_CUSTOM == ps_challenge->e_player))
     {
         payload += ps_challenge->b_rated ? "rated=true" : "rated=false";
         payload += "&keepAliveStream=false";

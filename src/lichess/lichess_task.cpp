@@ -264,6 +264,10 @@ static inline const char *get_player_name(challenge_st *ps_challenge)
     case PLAYER_AI_LEVEL_LOW:       name = "Stockfish level 2"; break;
     case PLAYER_AI_LEVEL_MEDIUM:    name = "Stockfish level 5"; break;
     case PLAYER_AI_LEVEL_HIGH:      name = "Stockfish level 8"; break;
+    case PLAYER_BOT_MAIA9:
+        strncpy(ps_challenge->ac_user, "maia9", sizeof(ps_challenge->ac_user));
+        name = ps_challenge->ac_user;
+        break;
     case PLAYER_CUSTOM:
         opponent = configs.getString("opponent", CHALLENGE_DEFAULT_OPPONENT_NAME);
         strncpy(ps_challenge->ac_user, opponent.c_str(), sizeof(ps_challenge->ac_user));
