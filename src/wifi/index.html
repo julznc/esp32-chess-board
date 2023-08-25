@@ -47,7 +47,7 @@ form input { margin: 2px auto;}
     <div class="panel">
       <form method="post" action="/lichess-token">
         <fieldset><legend>Access Token</legend>
-          <input type="text" name="token" size="32" minlength="20" placeholder="********" required><input type="submit" value="Set"><br><br>
+          <input type="text" name="token" size="32" minlength="20" placeholder="********" required>&nbsp;<input type="submit" value="Set"><br><br>
           <a href="https://lichess.org/account/oauth/token/create?scopes[]=challenge:write&scopes[]=challenge:read&scopes[]=board:play" target="_blank">Generate a personal access token.</a>
         </fieldset>
       </form><br>
@@ -55,11 +55,11 @@ form input { margin: 2px auto;}
         <fieldset><legend>Games</legend>
           <label style="width: 9ch;">Limit</label>&nbsp;<input type="number" name="clock-limit" min="10" max="90" size="5" required>&nbsp;<label>minutes</label><br>
           <label style="width: 9ch;">Increment</label>&nbsp;<input type="number" name="clock-increment" min="0" max="30" size="5" required>&nbsp;<label>seconds</label><br>
-          <label style="width: 9ch;">Opponent</label>&nbsp;<input type="text" name="opponent" placeholder="(optional)">&nbsp;<label><a href="https://lichess.org/player/bots" target="_blank">bots</a></label><br>
-          <label style="width: 9ch;">Mode</label>&nbsp;
-          <input type="radio" name="mode" id="rated" value="rated" disabled><label for="rated">Rated</label>
-          <input type="radio" name="mode" id="casual" value="casual" disabled checked><label for="casual">Casual</label><br>
-          <input type="submit" style="margin: 3px 11.5ch -2px; padding: 0 2ch;" value="Set">
+          <label style="width: 9ch;">Opponent</label>&nbsp;<input type="text" name="opponent" placeholder="(optional)">&nbsp;<a href="https://lichess.org/player/bots" target="_blank">bots</a><br>
+          <div style="margin-bottom: 8px;"></div><label style="width: 9ch;">Mode</label>&nbsp;
+          <input type="radio" name="mode" id="rated" value="rated" required><label for="rated">Rated</label>&nbsp;&nbsp;
+          <input type="radio" name="mode" id="casual" value="casual" required><label for="casual">Casual</label><br>
+          <input type="submit" style="margin: 12px 11.5ch -2px; padding: 0 2ch;" value="Set">
         </fieldset>
       </form>
     </div>
@@ -106,6 +106,7 @@ form input { margin: 2px auto;}
       document.querySelector('input[name="clock-limit"]').value = cfg.limit;
       document.querySelector('input[name="clock-increment"]').value = cfg.increment;
       document.querySelector('input[name="opponent"]').value = cfg.opponent;
+      document.getElementById(cfg.mode).checked = true;
     });
   }).catch(function(err){ console.log(err); });
   fetch("/wifi-cfg").then(function(rsp) {

@@ -46,10 +46,11 @@ static void handleSetGameOptions()
     String limit     = server.arg("clock-limit");
     String increment = server.arg("clock-increment");
     String opponent  = server.arg("opponent");
+    String mode      = server.arg("mode");
 
-    bool b_status = lichess::set_game_options(opponent, limit.toInt() * 60, increment.toInt());
-    LOGD("opponent: \"%s\" timecontrol: %d+%d (%s)",
-        opponent.c_str(), limit.toInt(), increment.toInt(), b_status ? "ok" : "failed");
+    bool b_status = lichess::set_game_options(opponent, limit.toInt() * 60, increment.toInt(), mode == "rated");
+    LOGD("opponent: \"%s\" (%s) time_control: %d+%d (%s)",
+        opponent.c_str(), mode.c_str(), limit.toInt(), increment.toInt(), b_status ? "ok" : "failed");
     server.send(b_status ? 200 : 400, "text/plain", b_status ? "ok" : "failed");
 }
 
@@ -119,13 +120,14 @@ void serverSetup(void)
     });
 
     server.on("/lichess-game", HTTP_GET, []() {
-        char rsp[128];
-        String opponent;
-        uint16_t u16_limit;
-        uint8_t u8_increment;
-        lichess::get_game_options(opponent, u16_limit, u8_increment);
-        snprintf(rsp, sizeof(rsp), "{\"opponent\": \"%s\", \"limit\":%u, \"increment\": %u}",
-                opponent.c_str(), u16_limit / 60, u8_increment);
+        char        rsp[128];
+        String      opponent;
+        uint16_t    u16_limit;
+        uint8_t     u8_increment;
+        bool        b_rated;
+        lichess::get_game_options(opponent, u16_limit, u8_increment, b_rated);
+        snprintf(rsp, sizeof(rsp), "{\"opponent\": \"%s\", \"mode\": \"%s\", \"limit\":%u, \"increment\": %u}",
+                opponent.c_str(), b_rated ? "rated" : "casual", u16_limit / 60, u8_increment);
         server.send(200, "application/json", rsp);
     });
 

@@ -58,8 +58,8 @@ void init(void);
 bool get_username(String &name);
 size_t set_token(const char *token);
 bool get_token(String &token);
-bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clock_increment);
-bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_clock_increment);
+bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clock_increment, bool b_rated);
+bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_clock_increment, bool &b_rated);
 
 
 /*

@@ -103,14 +103,15 @@ bool ApiClient::connect(void)
         //LOGD("heap before tls %lu", ESP.getFreeHeap());
         if (!_secClient.connect(_host.c_str(), _port, _connectTimeout))
         {
-            LOGW("failed connect to %s:%u", _host.c_str(), _port);
-            if (++num_connect_errors >= 5)
+            num_connect_errors++;
+            LOGW("failed connect to %s:%u (#%d)", _host.c_str(), _port, num_connect_errors);
+            if (num_connect_errors >= 5)
             {
                 LOGE("max connect errors. reconnect wifi.");
                 wifi::disconnect();
                 num_connect_errors = 0;
             }
-            delay(5000UL);
+            delay(2000UL);
         }
         else
         {

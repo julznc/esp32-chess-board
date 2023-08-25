@@ -313,7 +313,7 @@ static void taskClient(void *)
     delay(2500UL);
 
     s_challenge.e_player            = CHALLENGE_DEFAULT_OPPONENT;
-    s_challenge.b_rated             = false;
+    s_challenge.b_rated             = configs.getBool("rated", false);
     s_challenge.u16_clock_limit     = configs.getUShort("clock_limit", CHALLENGE_DEFAULT_LIMIT);
     s_challenge.u8_clock_increment  = configs.getUChar("clock_increment", CHALLENGE_DEFAULT_INCREMENT);
 
@@ -605,25 +605,29 @@ bool get_token(String &token)
     return token.length() > 0;
 }
 
-bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clock_increment)
+bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clock_increment, bool b_rated)
 {
     if ((configs.putString("opponent", opponent) < opponent.length()) ||
         (configs.putUShort("clock_limit", u16_clock_limit) < sizeof(uint16_t)) ||
-        (configs.putUChar("clock_increment", u8_clock_increment) < sizeof(uint8_t)))
+        (configs.putUChar("clock_increment", u8_clock_increment) < sizeof(uint8_t)) ||
+        (configs.putBool("rated", b_rated) < sizeof(bool)))
     {
+        LOGW("failed");
         return false;
     }
 
     return true;
 }
 
-bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_clock_increment)
+bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_clock_increment, bool &b_rated)
 {
     // default to maia9 bot
     opponent = configs.getString("opponent", CHALLENGE_DEFAULT_OPPONENT_NAME);
     // default to 15+10
     u16_clock_limit = configs.getUShort("clock_limit", CHALLENGE_DEFAULT_LIMIT);
     u8_clock_increment = configs.getUChar("clock_increment", CHALLENGE_DEFAULT_INCREMENT);
+    // default to casual
+    b_rated = configs.getBool("rated", false);
 
     return true;
 }
