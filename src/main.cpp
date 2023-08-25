@@ -13,9 +13,14 @@ void setup()
     WDT_WATCH(NULL);
 
     ui::init();
+
+    while (!ui::display::battLevelOk()) {
+        delay(100); // pause
+    }
+
     brd::init();
-    lichess::init();
     wifi::setup();
+    lichess::init();
 }
 
 void loop()

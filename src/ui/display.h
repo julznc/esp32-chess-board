@@ -47,10 +47,13 @@ bool init(void);
 bool lock();
 void unlock();
 
+// via 3k3 & 5k6 voltage divider resistors
 //#define BATT_ADC_SCALE          ((3.3 x 5.6) / ((3.3 + 5.6) * 4095))  // raw to V
 #define BATT_ADC_SCALE          (0.0005070585f)
+#define BATT_LEVEL_MIN          ((uint16_t)(3.4f / BATT_ADC_SCALE))     //
 
 void showBattLevel(void);
+bool battLevelOk(void);
 
 } // namespace ui::display
 

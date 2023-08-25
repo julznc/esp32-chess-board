@@ -1,3 +1,4 @@
+#include <atomic>
 
 #include "globals.h"
 #include "display.h"
@@ -14,8 +15,10 @@ Adafruit_SH1106G oled(SCREEN_WIDTH, SCREEN_HEIGHT);
 const GFXfont *font2 = &FreeSans9pt7b;
 //const GFXfont *font2 = &FreeSansBold9pt7b;
 
-static SemaphoreHandle_t mtx = NULL;
-static bool b_display_found  = false;
+static SemaphoreHandle_t mtx             = NULL;
+static std::atomic<bool> b_display_found;
+static std::atomic<bool> b_batt_ok;
+static uint8_t           u8_error_count  = 0;
 
 
 bool init(void)
@@ -28,10 +31,19 @@ bool init(void)
         oled.begin();
     }
 
+    b_display_found = false;
+    b_batt_ok       = false;
+
     if (!oled.init())
     {
         LOGW("OLED not found");
         b_display_found = false;
+      #if 1 // skip checking of battery level if testing with mcu-board only
+        if (++u8_error_count >= 3) {
+            b_batt_ok       = true;
+            u8_error_count  = 0;
+        }
+      #endif
         delay(5000UL);
     }
     else
@@ -43,6 +55,7 @@ bool init(void)
         oled.display();
         LOGD("OLED ok");
         b_display_found = true;
+        u8_error_count  = 0;
     }
 
     return b_display_found;
@@ -60,16 +73,30 @@ void unlock()
 
 void showBattLevel(void)
 {
-    static uint16_t  prev_raw = 0;
-    uint16_t         raw      = analogRead(BATT_ADC_PIN);
+    static bool     b_warned = false;
+    static uint16_t prev_raw = BATT_LEVEL_MIN / 2;
+    uint16_t        raw      = analogRead(BATT_ADC_PIN);
 
     if (prev_raw != raw)
     {
         float f_batt = ((float)(raw + prev_raw) / 2) * BATT_ADC_SCALE;
         //DISPLAY_TEXT1(0, 20, "Batt %.2fV", f_batt);
         DISPLAY_TEXT1(95, 0, "%.2fV", f_batt);
-        prev_raw = raw;
+        b_batt_ok   = (raw >= BATT_LEVEL_MIN);
+        prev_raw    = raw;
+
+        if (!b_batt_ok && !b_warned)
+        {
+            LOGW("low battery level");
+            DISPLAY_TEXT1(10, 10, "LOW BATTERY LEVEL");
+            b_warned = true;
+        }
     }
+}
+
+bool battLevelOk(void)
+{
+    return b_batt_ok;
 }
 
 } // namespace ui::display
