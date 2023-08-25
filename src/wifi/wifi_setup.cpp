@@ -1,3 +1,4 @@
+#include <atomic>
 #include <Preferences.h>
 #include <sntp.h>
 #include <esp_wifi.h>
@@ -27,7 +28,7 @@ static String               hostname = AP_SSID_PREFIX; // soft-ap name
 static String               host_ssid;
 static IPAddress            ip;
 static Preferences          configs;
-static volatile bool        b_ntp_connected = false;
+static std::atomic<bool>    b_ntp_connected;
 static volatile uint32_t    ms_soft_ap;     // AP fallback start timestamp
 
 static enum {
@@ -291,6 +292,7 @@ static inline void loop()
 static void taskWiFi(void *)
 {
     bool b_server_running = false;
+    b_ntp_connected = false;
 
     web::serverSetup();
 
@@ -395,6 +397,12 @@ bool get_credentials(String &ssid, String &passwd)
     ssid = configs.getString("ssid");
     passwd = configs.getString("passwd");
     return (ssid.length() > 0) && (passwd.length() > 0);
+}
+
+void disconnect()
+{
+    b_ntp_connected = false;
+    WiFi.disconnect();
 }
 
 bool is_ntp_connected(void)

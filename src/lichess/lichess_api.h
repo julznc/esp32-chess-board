@@ -18,6 +18,7 @@ class ApiClient : public HTTPClient
     {
     public:
         SecClient();
+        void stop();
         uint8_t connected();
     };
 public:
@@ -36,6 +37,7 @@ public:
 private:
     String      _auth;
     SecClient   _secClient;
+    static int  num_connect_errors;
 };
 
 typedef enum

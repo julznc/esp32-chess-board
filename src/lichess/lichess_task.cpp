@@ -33,6 +33,7 @@ static challenge_st     s_incoming_challenge;
 static String           str_current_moves;
 static String           str_last_move;
 static game_st          s_current_game;
+static uint32_t         ms_last_stream; // timestamp of last receive data
 
 static char             ac_username[32];
 static Preferences      configs;
@@ -95,8 +96,15 @@ static int poll_events()
 
         if (0 == payload.length())
         {
+            if (millis() - ms_last_stream > 12000) // should receive every 6 seconds
+            {
+                LOGW("no data received (%lums)", millis() - ms_last_stream);
+                result = -1;
+            }
             break; // empty
         }
+
+        ms_last_stream = millis();
 
         if (payload.length() > 8 /* {"x":"y"} */)
         {
@@ -121,7 +129,9 @@ static int poll_events()
                     DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
                     if ((GAME_STATE_STARTED == result) && s_current_game.ac_id[0])
                     {
-                        chess::continue_game(s_current_game.ac_fen);
+                        if (str_current_moves.isEmpty()) {
+                            chess::continue_game(s_current_game.ac_fen);
+                        }
                         str_current_moves = ""; // clear starting moves
                         SHOW_OPPONENT("%.17s %c", s_current_game.ac_opponent, s_current_game.b_color ? 'B' : 'W');
                         SET_BOTTOM_MENU("<-Abort      Resign->");
@@ -215,12 +225,19 @@ static int poll_game_state()
 
         if (0 == payload.length())
         {
+            if (millis() - ms_last_stream > 12000) // should receive every 6 seconds
+            {
+                LOGW("no data received (%lums)", millis() - ms_last_stream);
+                result = -1;
+            }
             break; // empty
         }
 
+        ms_last_stream = millis();
+
         if (payload.length() > 8 /* {"x":"y"} */)
         {
-            LOGD("payload (%u): %s", payload.length(), payload.c_str());
+            //LOGD("payload (%u): %s", payload.length(), payload.c_str());
             response.clear();
             DeserializationError error = deserializeJson(response, payload);
             if (error)
@@ -325,6 +342,7 @@ static void taskClient(void *)
                 if (stream_client.startStream("/api/stream/event"))
                 {
                     LOGI("monitor events ok");
+                    ms_last_stream = millis();
                     u8_error_count = 0;
                     e_state = CLIENT_STATE_CHECK_EVENTS;
                 }
@@ -359,6 +377,7 @@ static void taskClient(void *)
                     String endpoint = "/api/board/game/stream/";
                     endpoint += (const char *)s_current_game.ac_id;
                     bool b_started = stream_client.startStream(endpoint.c_str());
+                    ms_last_stream = millis();
                     LOGI("monitor game '%s' %s", s_current_game.ac_id, b_started ? "ok" : "failed");
                 }
                 e_state = CLIENT_STATE_CHECK_GAME;
@@ -378,7 +397,7 @@ static void taskClient(void *)
             else if (s_current_game.e_state > GAME_STATE_STARTED)
             {
                 LOGD("end game stream");
-                SHOW_OPPONENT("finish-%s", s_current_game.ac_state);
+                SHOW_OPPONENT("finish: %s", s_current_game.ac_state);
                 stream_client.end(true);
                 memset(&s_current_game, 0, sizeof(s_current_game));
                 CLEAR_BOTTOM_MENU();
@@ -476,7 +495,7 @@ static void taskClient(void *)
             }
             else if (!fen.isEmpty())
             {
-                if (RIGHT_BTN.pressedDuration() >= 1500UL) {
+                if (RIGHT_BTN.pressedDuration() >= 1200UL) {
                     RIGHT_BTN.resetCount();
                     if (s_challenge.e_player < PLAYER_LAST_IDX) {
                         s_challenge.e_player++;
@@ -488,7 +507,7 @@ static void taskClient(void *)
                     SHOW_OPPONENT(get_player_name(&s_challenge));
                     b_opponent_changed = true;
                 }
-                else if (LEFT_BTN.pressedDuration() >= 1500UL) {
+                else if (LEFT_BTN.pressedDuration() >= 1200UL) {
                     LEFT_BTN.resetCount();
                     if (s_challenge.e_player > PLAYER_FIRST_IDX) {
                         s_challenge.e_player--;
@@ -502,16 +521,18 @@ static void taskClient(void *)
                 }
                 else if (RIGHT_BTN.shortPressed()) {
                     CLEAR_BOTTOM_MENU();
+                    SET_BOTTOM_MSG("wait for opponent...");
                     s_challenge.b_color = true;
-                    if (create_challenge(&s_challenge, fen.c_str())) {
-                        SET_BOTTOM_MSG("wait for opponent...");
+                    if (!create_challenge(&s_challenge, fen.c_str())) {
+                        SET_BOTTOM_MSG("              Retry->");
                     }
                 }
                 else if (LEFT_BTN.shortPressed()) {
                     CLEAR_BOTTOM_MENU();
+                    SET_BOTTOM_MSG("wait for opponent...");
                     s_challenge.b_color = false;
-                    if (create_challenge(&s_challenge, fen.c_str())) {
-                        SET_BOTTOM_MSG("wait for opponent...");
+                    if (!create_challenge(&s_challenge, fen.c_str())) {
+                        SET_BOTTOM_MSG("<-Retry");
                     }
                 }
             }

@@ -12,16 +12,31 @@
 namespace lichess
 {
 
-static ApiClient        main_client;    // main connection (non-stream)
+static  ApiClient   main_client;    // main connection (non-stream)
+int     ApiClient::num_connect_errors = 0;
 
 
 ApiClient::SecClient::SecClient() : WiFiClientSecure()
 {
-    _timeout = 20;
-    sslclient->handshake_timeout = 20000;
+    _timeout = 10;
+    sslclient->handshake_timeout = 10000;
 
-    // to do: load from preferences
+#if 1
     _CA_cert = LICHESS_ORG_PEM; // setCACert()
+#else // only ~100ms less connect() duration
+    setInsecure();
+#endif
+}
+
+void ApiClient::SecClient::stop()
+{
+    WiFiClientSecure::stop();
+
+#if 1 // re-initialize after stop_ssl_socket() -- required?
+    mbedtls_ssl_init(&sslclient->ssl_ctx);
+    mbedtls_ssl_config_init(&sslclient->ssl_conf);
+    mbedtls_ctr_drbg_init(&sslclient->drbg_ctx);
+#endif
 }
 
 uint8_t ApiClient::SecClient::connected()
@@ -42,7 +57,8 @@ uint8_t ApiClient::SecClient::connected()
 
 ApiClient::ApiClient() : HTTPClient()
 {
-    //
+    _connectTimeout = 10000; // ms
+    _tcpTimeout     = 10000; // ms
 }
 
 bool ApiClient::begin(const char *endpoint)
@@ -84,20 +100,28 @@ bool ApiClient::connect(void)
     b_status = _secClient.connected();
     if (!b_status)
     {
+        //LOGD("heap before tls %lu", ESP.getFreeHeap());
         if (!_secClient.connect(_host.c_str(), _port, _connectTimeout))
         {
             LOGW("failed connect to %s:%u", _host.c_str(), _port);
+            if (++num_connect_errors >= 5)
+            {
+                LOGE("max connect errors. reconnect wifi.");
+                wifi::disconnect();
+                num_connect_errors = 0;
+            }
             delay(5000UL);
         }
         else
         {
             _client->setTimeout((_tcpTimeout + 500) / 1000);
             //LOGD("connected to %s:%u", _host.c_str(), _port);
+            num_connect_errors = 0;
             b_status = _secClient.connected();
         }
     }
 #endif
-    LOGD("%s %s (%lums)", __func__, b_status ? "ok" : "failed", millis() - ms_start);
+    LOGD("%s %s %lums (heap %lu)", __func__, b_status ? "ok" : "failed", millis() - ms_start, ESP.getFreeHeap());
     return b_status;
 }
 
@@ -268,7 +292,7 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
             }
             else
             {
-                LOGW("GET %s failed: %s", endpoint, main_client.errorToString(httpCode).c_str());
+                LOGW("GET %s failed %s", endpoint, main_client.errorToString(httpCode).c_str());
             }
         }
         else
@@ -326,7 +350,7 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
             }
             else
             {
-                LOGW("POST %s failed: %s", endpoint, main_client.errorToString(httpCode).c_str());
+                LOGW("POST %s failed %s", endpoint, main_client.errorToString(httpCode).c_str());
             }
         }
         else
