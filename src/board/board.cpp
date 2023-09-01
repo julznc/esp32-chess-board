@@ -54,7 +54,7 @@ static bool checkSquares(void)
     static const uint8_t FILE_END   = 7;
 #else // testing only
     static const uint8_t RANK_START = 0;
-    static const uint8_t RANK_END   = 7;
+    static const uint8_t RANK_END   = 3;
     static const uint8_t FILE_START = 0;
     static const uint8_t FILE_END   = 3;
 #endif
@@ -77,6 +77,8 @@ static bool checkSquares(void)
             if ((u8_version == 0x00) || (u8_version == 0xFF))
             {
                 LOGW("sensor not found on square %c%u (%02X)", 'a' + file, rank + 1, u8_version);
+                DISPLAY_CLEAR_ROW(20, 8);
+                DISPLAY_TEXT1(0, 20, "sensor error on %c%u", 'A' + file, rank + 1);
                 ui::leds::clear();
                 ui::leds::setColor(rank, file, ui::leds::LED_RED);
                 b_complete = false;

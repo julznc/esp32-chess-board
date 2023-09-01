@@ -73,17 +73,20 @@ void unlock()
 
 void showBattLevel(void)
 {
-    static bool     b_warned = false;
-    static uint16_t prev_raw = BATT_LEVEL_MIN / 2;
-    uint16_t        raw      = analogRead(BATT_ADC_PIN);
+    static uint32_t prev_batt   = 0;
+    static bool     b_warned    = false;
+    uint32_t        scaled      = analogReadMilliVolts(BATT_ADC_PIN); // divided
+    uint32_t        batt        = (scaled * (BATT_ADC_R1 + BATT_ADC_R2)) / BATT_ADC_R2;
 
-    if (prev_raw != raw)
+    //LOGD("scaled=%lu mv=%lu", scaled, batt);
+
+    if (prev_batt != batt)
     {
-        float f_batt = ((float)(raw + prev_raw) / 2) * BATT_ADC_SCALE;
-        //DISPLAY_TEXT1(0, 20, "Batt %.2fV", f_batt);
+        float f_batt = (float)batt / 1000.0f; // mV to V
+
         DISPLAY_TEXT1(95, 0, "%.2fV", f_batt);
-        b_batt_ok   = (raw >= BATT_LEVEL_MIN);
-        prev_raw    = raw;
+        b_batt_ok   = (batt >= BATT_LEVEL_MIN);
+        prev_batt = batt;
 
         if (!b_batt_ok && !b_warned)
         {

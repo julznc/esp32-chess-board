@@ -47,10 +47,10 @@ bool init(void);
 bool lock();
 void unlock();
 
-// via 3k3 & 5k6 voltage divider resistors
-//#define BATT_ADC_SCALE          ((3.3 x 5.6) / ((3.3 + 5.6) * 4095))  // raw to V
-#define BATT_ADC_SCALE          (0.0005070585f)
-#define BATT_LEVEL_MIN          ((uint16_t)(3.4f / BATT_ADC_SCALE))     //
+// via voltage divider resistors
+#define BATT_ADC_R1             (3270)      // 3k3 (from BATT+)
+#define BATT_ADC_R2             (4780)      // 4k7 (to GND)
+#define BATT_LEVEL_MIN          (3400)      // int millivolts
 
 void showBattLevel(void);
 bool battLevelOk(void);
