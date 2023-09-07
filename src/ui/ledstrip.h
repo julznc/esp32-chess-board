@@ -10,6 +10,7 @@ namespace ui::leds
 
 typedef enum {
     LED_OFF,     // led-off
+    LED_RED_LOW,
     LED_RED,
     LED_ORANGE,
     LED_YELLOW,

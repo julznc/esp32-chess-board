@@ -12,7 +12,8 @@ Adafruit_NeoPixel pixels(LED_STRIP_NUMPIXELS, LED_STRIP_PIN, NEO_GRB + NEO_KHZ80
 
 #ifdef LED_TESTS
 
-static uint8_t au8_test_rgb[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+//static uint8_t au8_test_rgb[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static uint8_t au8_test_rgb[6] = {0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0x00}; // no blue
 static uint8_t u8_test_idx = 0;
 
 #endif
@@ -52,10 +53,11 @@ void setColor(uint8_t u8_rank, uint8_t u8_file, led_color_et e_color)
 {
 #ifdef LED_TESTS
     /*
-      red:      a7 00 00  -  ff 00 00
-      orange:   37 30 00  -  40 9f 00
-      yellow:   27 57 00  -  18 ff 00
-      green:    09 5f 00  -  00 ff 00
+      red_low:  06 00 00  -  10 00 00
+      red:      50 00 00  -  ff 00 00
+      orange:   30 0f 00  -  50 df 00
+      yellow:   10 0f 00  -  20 ff 00
+      green:    04 0f 00  -  00 ff 00
     */
     if (LIGHT_SQUARE(u8_rank, u8_file))
     {
@@ -70,16 +72,17 @@ void setColor(uint8_t u8_rank, uint8_t u8_file, led_color_et e_color)
     static const uint8_t K_RGB[][6] = {
         // light squares  , dark squares
         { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, // off
-        { 0xa7, 0x00, 0x00, 0xff, 0x00, 0x00 }, // red
-        { 0x37, 0x30, 0x00, 0x40, 0x9f, 0x00 }, // orange
-        { 0x27, 0x57, 0x00, 0x18, 0xff, 0x00 }, // yellow
-        { 0x09, 0x5f, 0x00, 0x00, 0xff, 0x00 }, // green
+        { 0x06, 0x00, 0x00, 0x10, 0x00, 0x00 }, // red_low
+        { 0x50, 0x00, 0x00, 0xff, 0x00, 0x00 }, // red
+        { 0x30, 0x0f, 0x00, 0x50, 0xdf, 0x00 }, // orange
+        { 0x10, 0x0f, 0x00, 0x20, 0xff, 0x00 }, // yellow
+        { 0x04, 0x0f, 0x00, 0x00, 0xff, 0x00 }, // green
     };
 
     uint8_t u8_idx = 0;
     uint8_t u8_offset = 0;
 
-    if ((e_color >= LED_RED) && (e_color <= LED_GREEN)) {
+    if ((e_color >= LED_RED_LOW) && (e_color <= LED_GREEN)) {
         u8_idx = e_color;
     }
 
@@ -131,29 +134,41 @@ void test2(void)
         }
         LOGD("test idx = %u", u8_test_idx);
     }
-    if (btn::pb2.released())
+    if (btn::pb2.released() || (btn::pb2.pressedDuration() > 100))
     {
         //LOGD("pb2 count %u", btn::pb2.getCount());
+        btn::pb2.resetCount();
         if (au8_test_rgb[u8_test_idx] <= 8) {
             au8_test_rgb[u8_test_idx]  = 0;
         } else {
-            au8_test_rgb[u8_test_idx] -= 8;
+            au8_test_rgb[u8_test_idx] -= 2;
         }
-        LOGD("colors = (%02x %02x %02x) (%02x %02x %02x)",
+        LOGD("colors [%u] = (%02x %02x %02x) (%02x %02x %02x)", u8_test_idx,
             au8_test_rgb[0], au8_test_rgb[1], au8_test_rgb[2],
             au8_test_rgb[3], au8_test_rgb[4], au8_test_rgb[5]);
     }
-    if (btn::pb3.released())
+    if (btn::pb3.released() || (btn::pb3.pressedDuration() > 100))
     {
         //LOGD("pb3 count %u", btn::pb3.getCount());
+        btn::pb3.resetCount();
         if (au8_test_rgb[u8_test_idx] >= (255-8)) {
             au8_test_rgb[u8_test_idx]  = 255;
         } else {
-            au8_test_rgb[u8_test_idx] += 8;
+            au8_test_rgb[u8_test_idx] += 2;
         }
-        LOGD("colors = (%02x %02x %02x) (%02x %02x %02x)",
+        LOGD("colors [%u] = (%02x %02x %02x) (%02x %02x %02x)", u8_test_idx,
             au8_test_rgb[0], au8_test_rgb[1], au8_test_rgb[2],
             au8_test_rgb[3], au8_test_rgb[4], au8_test_rgb[5]);
+    }
+
+    static uint32_t prev_ms = 0;
+    if (millis() - prev_ms > 250)
+    {
+        prev_ms = millis();
+        for (uint8_t rank = 1; rank < 4; rank++)
+            for (uint8_t file = 1; file < 4; file++)
+                setColor(rank, file, LED_OFF);
+        pixels.show();
     }
 }
 

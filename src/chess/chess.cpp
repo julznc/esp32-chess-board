@@ -248,15 +248,8 @@ static inline void show_turn(void)
     static bool state = false;
 
     // blink king's square
-    ui::leds::setColor(s_game.stats.kings[s_game.stats.turn], state ? ui::leds::LED_ORANGE : ui::leds::LED_OFF);
-    ui::leds::setColor(s_game.stats.kings[SWAP_COLOR(s_game.stats.turn)], ui::leds::LED_OFF);
-    if (WHITE == s_game.stats.turn) { // blink e4 square
-        ui::leds::setColor(e4, state ? ui::leds::LED_OFF : ui::leds::LED_GREEN);
-        ui::leds::setColor(e5, ui::leds::LED_OFF);
-    } else { // blink e5 square
-        ui::leds::setColor(e5, state ? ui::leds::LED_OFF : ui::leds::LED_GREEN);
-        ui::leds::setColor(e4, ui::leds::LED_OFF);
-    }
+    ui::leds::setColor(s_game.stats.kings[s_game.stats.turn], state ? ui::leds::LED_GREEN : ui::leds::LED_OFF);
+    ui::leds::setColor(s_game.stats.kings[SWAP_COLOR(s_game.stats.turn)], state ? ui::leds::LED_OFF : ui::leds::LED_RED_LOW);
 
     state = !state; // blink
 }
@@ -407,7 +400,7 @@ static inline bool check_start_fen(void)
     {
         if (pu8_pieces[u8_idx] != AU8_START_PIECES[u8_idx])
         {
-            ui::leds::setColor(u8_idx>>3, u8_idx&7, ui::leds::LED_RED);
+            ui::leds::setColor(u8_idx>>3, u8_idx&7, ui::leds::LED_RED_LOW);
             u8_diff++;
         }
     }
@@ -486,7 +479,7 @@ void loop(uint32_t ms_last_changed)
             LOGD("touch %s %s on %c%u", color_to_string(PIECE_COLOR(piece)), piece_to_string(PIECE_TYPE(piece)),
                 ALGEBRAIC(au8_allowed_squares[0]));
           #endif
-            ui::leds::setColor(au8_allowed_squares[0], ui::leds::LED_ORANGE);
+            ui::leds::setColor(au8_allowed_squares[0], (1 == u8_squares_count) ? ui::leds::LED_RED : ui::leds::LED_ORANGE);
             for (uint8_t i = 1; i < u8_squares_count; i++) {
                 ui::leds::setColor(au8_allowed_squares[i], ui::leds::LED_GREEN);
                 //LOGD("%u/%u %c%u", i, u8_squares_count - 1, ALGEBRAIC(au8_allowed_squares[i]));
