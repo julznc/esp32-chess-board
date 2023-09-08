@@ -740,7 +740,7 @@ bool queue_move(const String &move)
         {
             if ((to_sq != pending_move.to) || (from_sq != pending_move.from))
             {
-                LOGD("queue %c%u%c%u", ALGEBRAIC(from_sq), ALGEBRAIC(to_sq));
+                //LOGD("queue %c%u%c%u", ALGEBRAIC(from_sq), ALGEBRAIC(to_sq));
                 lock();
                 pending_move.piece = s_game.board[from_sq];
                 pending_move.from = from_sq;

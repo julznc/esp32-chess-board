@@ -92,6 +92,7 @@ bool ApiClient::begin(const char *endpoint)
 
 bool ApiClient::connect(void)
 {
+    static const int max_connect_errors = 3;
     bool b_status;
     uint32_t ms_start = millis();
 #if 0
@@ -104,14 +105,13 @@ bool ApiClient::connect(void)
         if (!_secClient.connect(_host.c_str(), _port, _connectTimeout))
         {
             num_connect_errors++;
-            LOGW("failed connect to %s:%u (#%d)", _host.c_str(), _port, num_connect_errors);
-            if (num_connect_errors >= 5)
+            LOGW("failed connect to %s:%u (%d/%d)", _host.c_str(), _port, num_connect_errors, max_connect_errors);
+            if (num_connect_errors >= max_connect_errors)
             {
                 LOGE("max connect errors. reconnect wifi.");
                 wifi::disconnect();
                 num_connect_errors = 0;
             }
-            delay(2000UL);
         }
         else
         {
@@ -222,7 +222,7 @@ bool ApiClient::startStream(const char *endpoint)
 
         if (!connect())
         {
-            LOGW("connect() failed");
+            //LOGW("connect() failed");
         }
         else if (!sendHeader("GET"))
         {
@@ -235,6 +235,8 @@ bool ApiClient::startStream(const char *endpoint)
     }
 
     if (!b_status) {
+        //LOGW("stream(%s) failed", endpoint);
+        _uri = "";
         end(true);
     }
 

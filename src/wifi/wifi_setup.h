@@ -15,6 +15,7 @@ bool set_credentials(const char *ssid, const char *passwd);
 bool get_credentials(String &ssid, String &passwd);
 
 void disconnect(void);
+bool connected(void);
 bool is_ntp_connected(void);
 bool get_host(String &name, IPAddress &addr);
 

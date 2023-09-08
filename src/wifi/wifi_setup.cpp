@@ -48,7 +48,7 @@ static struct {
     uint8_t         u8_connect;     // connect index
     uint8_t         u8_retry;       // connect retry counter
     uint8_t         u8_total;       // total stations found
-    bool            b_connected;    // connected to AP
+    uint32_t        ms_connected;   // timestamp last connected to internet
 } s_found_stations;
 
 
@@ -60,6 +60,8 @@ static void init()
 
     if (!b_init)
     {
+        memset(&s_found_stations, 0, sizeof(s_found_stations));
+
         b_init = true;
         WiFi.persistent(false);
         WiFi.setAutoReconnect(false);
@@ -86,23 +88,30 @@ static void init()
     WiFi.setSleep(false);
 
     b_ntp_connected = false;
-
-    memset(&s_found_stations.as_ap, 0, sizeof(s_found_stations.as_ap));
-    s_found_stations.u8_connect = 0;
-    s_found_stations.u8_total   = 0;
-    s_found_stations.b_connected= false;
 }
 
 static inline bool scan()
 {
+    String cfg_ssid;
+    String cfg_passwd;
+    wifi::get_credentials(cfg_ssid, cfg_passwd);
+
+    if (cfg_ssid.isEmpty() || cfg_passwd.isEmpty())
+    {
+        LOGW("no configured wifi credentials");
+        SHOW_STATUS("No Wi-Fi config");
+        delay(3000);
+        return false;
+    }
+
     LOGD("Scanning local WiFi networks ...");
     SHOW_STATUS("scanning Wi-Fi...");
     int stationsFound = WiFi.scanNetworks();
     LOGD("%i networks found", stationsFound);
 
-    String cfg_ssid;
-    String cfg_passwd;
-    wifi::get_credentials(cfg_ssid, cfg_passwd);
+    memset(&s_found_stations.as_ap, 0, sizeof(s_found_stations.as_ap));
+    s_found_stations.u8_connect = 0;
+    s_found_stations.u8_total   = 0;
 
     for (int i = 0; i < stationsFound; ++i)
     {
@@ -133,6 +142,7 @@ static inline bool scan()
 
 static inline void connect()
 {
+    //LOGD("connect %u/%u retry %u/%u", s_found_stations.u8_connect, s_found_stations.u8_total, s_found_stations.u8_retry + 1, MAX_CONNECT_RETRIES);
     if (s_found_stations.u8_connect >= s_found_stations.u8_total)
     {
         if (++s_found_stations.u8_retry >= MAX_CONNECT_RETRIES)
@@ -143,12 +153,9 @@ static inline void connect()
             WiFi.mode(WIFI_OFF);
           #endif
             s_found_stations.u8_retry = 0;
-            e_state = WIFI_STATE_AP; // fallback to soft-ap
         }
-        else
-        {
-            e_state = WIFI_STATE_INIT; // try rescan again
-        }
+        s_found_stations.u8_connect = 0;
+        e_state = WIFI_STATE_INIT; // try rescan again
     }
     else
     {
@@ -178,14 +185,14 @@ static inline void connect()
         while (millis() - start <= MS_CONNECT_TIMEOUT) {
             status = WiFi.status();
             PRINTF("%d", status);
-            if ((WL_CONNECTED == status) || (WL_CONNECT_FAILED ==  status)) {
+            if ((WL_CONNECTED == status) || (WL_CONNECT_FAILED == status)) {
                 break;
             }
             delay(500);
         }
         PRINTF("\r\n");
 
-        if (status == WL_CONNECTED)
+        if (WL_CONNECTED == status)
         {
             ip = WiFi.localIP();
             LOGI("connected to %s %s %d.%d.%d.%d", WiFi.BSSIDstr().c_str(),
@@ -195,8 +202,7 @@ static inline void connect()
             // set NTP
             configTime(PH_GMT_OFFSET_SEC, PH_DAYLIGHT_OFFSET_SEC, NTP_SERVERS[0], NTP_SERVERS[1], NTP_SERVERS[2]);
 
-            s_found_stations.b_connected = true;
-            s_found_stations.u8_retry    = 0;
+            s_found_stations.u8_retry = 0;
             host_ssid   = ssid;
             ms_soft_ap  = 0;
             e_state     = WIFI_STATE_LOOP;
@@ -205,6 +211,10 @@ static inline void connect()
         {
             // try next
             s_found_stations.u8_connect++;
+            if (WL_CONNECT_FAILED == status) {
+                LOGW("failed"); // e.g. AP was turned off, so just wait. before reconnecting
+                delay(3000);
+            }
         }
     }
 }
@@ -226,7 +236,8 @@ static inline void soft_ap()
     {
         ip = WiFi.softAPIP();
         LOGI("IP address: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-        SHOW_STATUS("%.8s %d.%d", hostname.c_str() + 19, ip[2], ip[3]);
+        // "esp32-chess-xx-xx-xx-xx-xx-xx"
+        SHOW_STATUS("%.8s %d.%d.%d.%d", hostname.c_str() + 21, ip[0], ip[1], ip[2], ip[3]);
 
         ms_soft_ap  = millis();
         e_state     = WIFI_STATE_LOOP;
@@ -243,6 +254,7 @@ static inline void ntp_check(void)
             {
                 b_ntp_connected = true;
                 LOGI("sntp(%d) \"%s\"", i+1, sntp_getservername(i));
+                s_found_stations.ms_connected = millis();
 #if 0
                 delay(2000UL);
                 set_rtc_datetime(get_datetime()); // try update rtc
@@ -313,6 +325,10 @@ static void taskWiFi(void *)
             }
             init();
             e_state = WIFI_STATE_SCAN;
+            if ((0 != s_found_stations.ms_connected) && (millis() - s_found_stations.ms_connected < (5 * 60 * 1000UL)))
+            {
+                e_state = WIFI_STATE_CONNECT; // try reconnect only, if got recent connection
+            }
             break;
 
         case WIFI_STATE_SCAN:
@@ -320,9 +336,13 @@ static void taskWiFi(void *)
             {
                 e_state = WIFI_STATE_CONNECT;
             }
+            else if (0 != s_found_stations.ms_connected)
+            {
+                // rescan if has connected previously
+            }
             else
             {
-                e_state = WIFI_STATE_AP;
+                e_state = WIFI_STATE_AP; // fallback to soft-ap
             }
             break;
 
@@ -401,8 +421,12 @@ bool get_credentials(String &ssid, String &passwd)
 
 void disconnect()
 {
-    b_ntp_connected = false;
     WiFi.disconnect();
+}
+
+bool connected(void)
+{
+    return (0 != s_found_stations.ms_connected) && (WL_CONNECTED == WiFi.status());
 }
 
 bool is_ntp_connected(void)
@@ -412,7 +436,7 @@ bool is_ntp_connected(void)
 
 bool get_host(String &name, IPAddress &addr)
 {
-    if (s_found_stations.b_connected)
+    if (0 != connected())
     {
         name = host_ssid;
         addr = ip;

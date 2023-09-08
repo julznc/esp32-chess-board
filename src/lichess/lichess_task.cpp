@@ -56,9 +56,12 @@ static bool get_account()
 
     SHOW_STATUS("lichess.org ...");
 
-    memset(ac_username, 0, sizeof(ac_username));
-
-    if (!api_get("/api/account", response))
+    if (ac_username[0])
+    {
+        SHOW_STATUS("%.*s", 20, ac_username);
+        b_status = true;
+    }
+    else if (!api_get("/api/account", response))
     {
         SHOW_STATUS("lichess api error");
     }
@@ -82,9 +85,10 @@ static bool get_account()
 static int poll_events()
 {
     String  payload;
+    String  endpoint = stream_client.getEndpoint();
     int     result = -1;
 
-    if (!stream_client.getEndpoint().startsWith("/api/stream/event"))
+    if (!endpoint.isEmpty() && !endpoint.startsWith("/api/stream/event"))
     {
         return  0; // ignore, not for us
     }
@@ -96,7 +100,7 @@ static int poll_events()
 
         if (0 == payload.length())
         {
-            if (millis() - ms_last_stream > 12000) // should receive every 6 seconds
+            if (millis() - ms_last_stream > (6000UL + 500)) // should receive every 6 seconds
             {
                 LOGW("no data received (%lums)", millis() - ms_last_stream);
                 result = -1;
@@ -211,9 +215,10 @@ static inline void display_clock(bool b_turn, bool b_show)
 static int poll_game_state()
 {
     String  payload;
+    String  endpoint = stream_client.getEndpoint();
     int     result = -1;
 
-    if (!stream_client.getEndpoint().startsWith("/api/board/game/stream"))
+    if (!endpoint.isEmpty() && !endpoint.startsWith("/api/board/game/stream"))
     {
         return  0; // ignore, not for us
     }
@@ -225,7 +230,7 @@ static int poll_game_state()
 
         if (0 == payload.length())
         {
-            if (millis() - ms_last_stream > 12000) // should receive every 6 seconds
+            if (millis() - ms_last_stream > (6000UL + 500)) // should receive every 6 seconds
             {
                 LOGW("no data received (%lums)", millis() - ms_last_stream);
                 result = -1;
@@ -259,6 +264,7 @@ static int poll_game_state()
                     str_last_move = str_current_moves.substring(sp + 1);
                 }
                 LOGD("%s (%d) %s", type, result, str_last_move.c_str());
+                chess::queue_move(str_last_move);
                 //LOGD("%s", str_current_moves.c_str());
                 display_clock(s_current_game.b_turn, true);
             }
@@ -304,7 +310,7 @@ static void taskClient(void *)
     challenge_st            s_challenge; // outgoing challenge
     const chess::stats_st  *fen_stats   = NULL;
     String      fen, prev_fen;
-    String      last_move, queued_move;
+    String      last_move;
     bool        b_opponent_changed = false;
     uint8_t     u8_error_count   = 0;
 
@@ -326,7 +332,7 @@ static void taskClient(void *)
         switch (e_state)
         {
         case CLIENT_STATE_INIT:
-            if ((u8_error_count < 10) && wifi::is_ntp_connected())
+            if ((u8_error_count < 10) && wifi::connected())
             {
                 e_state = CLIENT_STATE_GET_ACCOUNT;
             }
@@ -348,6 +354,7 @@ static void taskClient(void *)
                 }
                 else
                 {
+                    LOGW("monitor events failed");
                     u8_error_count++;
                     e_state = CLIENT_STATE_IDLE;
                 }
@@ -376,9 +383,24 @@ static void taskClient(void *)
                     // api/board/game/stream/{gameId}
                     String endpoint = "/api/board/game/stream/";
                     endpoint += (const char *)s_current_game.ac_id;
+
+                    SHOW_STATUS("stream game...");
                     bool b_started = stream_client.startStream(endpoint.c_str());
+
+                    if (!b_started)
+                    {
+                        LOGW("monitor game '%s' failed", s_current_game.ac_id);
+                        SHOW_STATUS("stream game failed");
+                        if (++u8_error_count >= 3) {
+                            e_state = CLIENT_STATE_INIT;
+                        }
+                        break;
+                    }
+
                     ms_last_stream = millis();
-                    LOGI("monitor game '%s' %s", s_current_game.ac_id, b_started ? "ok" : "failed");
+                    u8_error_count = 0;
+                    LOGI("monitor game '%s' ok", s_current_game.ac_id);
+                    SHOW_STATUS("game: %.*s", 14, s_current_game.ac_id);
                 }
                 e_state = CLIENT_STATE_CHECK_GAME;
             }
@@ -451,14 +473,6 @@ static void taskClient(void *)
                     }
                 }
 
-                if (!str_last_move.isEmpty() && (str_last_move != last_move))
-                {
-                    if ((queued_move != str_last_move) && chess::queue_move(str_last_move))
-                    {
-                        queued_move = str_last_move;
-                    }
-                }
-
                 display_clock(b_turn, true);
             }
             else if (s_current_game.e_state > GAME_STATE_STARTED)
@@ -467,7 +481,6 @@ static void taskClient(void *)
                 fen = "";
                 prev_fen = "";
                 last_move = "";
-                queued_move = "";
             }
             e_state = CLIENT_STATE_IDLE;
             break;
