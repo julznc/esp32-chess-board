@@ -54,11 +54,11 @@ class ApiClient
         ~SecClient();
         int connect();
         uint8_t connected();
-        void stop();
+        void stop(bool b_deinit);
         size_t write(const uint8_t *buf, size_t size);
         int available();
         int read(uint8_t *buf, size_t size);
-        int readline(char *buf, size_t size);
+        int readline(char *buf, size_t size, uint32_t timeout);
         void flush();
         int fd() const { return _sock_fd; }
 
@@ -91,7 +91,7 @@ public:
     void end(bool b_stop /*close ssl connection*/);
     int sendRequest(const char *type, const uint8_t *payload=NULL, size_t size=0);
     bool startStream(const char *endpoint);
-    int readline(char *buf, size_t size);
+    int readline(char *buf, size_t size, uint32_t timeout);
     const char *getEndpoint() const { return _uri; }
 
 protected:

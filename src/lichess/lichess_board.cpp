@@ -133,7 +133,7 @@ int parse_game_state(const cJSON *state, game_st *ps_game /*output*/)
     if (cJSON_HasObjectItem(state, "type"))
     {
         const char *type = GET_STR(state, "type");
-        LOGD("event %s", type);
+        //LOGD("event %s", type);
 
         game_stream_state_et e_type = get_stream_state(type);
         if (GAME_STREAM_STATE_FULL == e_type)
@@ -144,6 +144,10 @@ int parse_game_state(const cJSON *state, game_st *ps_game /*output*/)
         else if (GAME_STREAM_STATE_CURRENT == e_type)
         {
             parse_game_state_event(state, ps_game);
+        }
+        else if (GAME_STREAM_STATE_CHATLINE == e_type)
+        {
+            LOGI("[chat] %s: %s", GET_STR(state, "username"), GET_STR(state, "text"));
         }
         else
         {

@@ -20,13 +20,11 @@ int     ApiClient::num_connect_errors = 0;
 ApiClient::SecClient::SecClient() : _sock_fd(-1), _b_init_done(false), _b_connected(false)
 {
     memset(&_server_addr, 0, sizeof(_server_addr));
-    _server_addr.sin_family = AF_INET;
 }
 
 ApiClient::SecClient::~SecClient()
 {
-    stop();
-    deinit_ssl();
+    stop(true);
 }
 
 int ApiClient::SecClient::connect()
@@ -43,7 +41,7 @@ int ApiClient::SecClient::connect()
     }
     else if (0 != connect_ssl())
     {
-        stop();
+        stop(false);
     }
     else
     {
@@ -69,17 +67,22 @@ uint8_t ApiClient::SecClient::connected()
             {
                 LOGW("ssl_read(0) = -0x%x", -err);
             }
-            stop();
+            stop(false);
         }
     }
 
     return _b_connected;
 }
 
-void ApiClient::SecClient::stop()
+void ApiClient::SecClient::stop(bool b_deinit)
 {
     //mbedtls_ssl_close_notify(&_ssl_ctx);
     mbedtls_ssl_session_reset(&_ssl_ctx);
+
+    if (b_deinit) {
+        memset(&_server_addr, 0, sizeof(_server_addr));
+        deinit_ssl();
+    }
 
     if (_sock_fd > 0){
         lwip_shutdown(_sock_fd, 2);
@@ -97,7 +100,7 @@ size_t ApiClient::SecClient::write(const uint8_t *buf, size_t size)
     if (_b_connected)
     {
         if ((res = send_ssl(buf, size)) < 0) {
-            stop();
+            stop(false);
             res = 0;
         }
     }
@@ -115,9 +118,9 @@ int ApiClient::SecClient::read(uint8_t *buf, size_t size)
     return _b_connected ? mbedtls_ssl_read(&_ssl_ctx, buf, size) : 0;
 }
 
-int ApiClient::SecClient::readline(char *buf, size_t size)
+int ApiClient::SecClient::readline(char *buf, size_t size, uint32_t timeout)
 {
-    uint32_t    read_timeout = millis() + LICHESS_API_TIMEOUT_MS;
+    uint32_t    read_timeout = millis() + (timeout ? timeout : LICHESS_API_TIMEOUT_MS);
     int         len = 0;
     uint8_t     ch  = 0;
 
@@ -247,6 +250,7 @@ int ApiClient::SecClient::connect_socket()
         }
         _server_addr.sin_addr.s_addr = address;
         _server_addr.sin_port        = htons(LICHESS_API_PORT);
+        _server_addr.sin_family      = AF_INET;
         LOGI("'%s' = %s", host, address.toString().c_str());
     }
 
@@ -462,7 +466,7 @@ bool ApiClient::connect(void)
         }
     }
 
-    LOGD("%s %s %lums (fd %d heap %lu)", __func__, b_status ? "ok" : "failed", millis() - ms_start, _secClient.fd(), ESP.getFreeHeap());
+    LOGD("%s %lums (fd %d heap %lu)", b_status ? "ok" : "failed", millis() - ms_start, _secClient.fd(), ESP.getFreeHeap());
     return b_status;
 }
 
@@ -477,7 +481,7 @@ void ApiClient::end(bool b_stop)
         _secClient.flush();
     }
     if (b_stop) {
-        _secClient.stop();
+        _secClient.stop(true);
     }
     memset(_uri, 0, sizeof(_uri));
     _returnCode = 0;
@@ -525,7 +529,7 @@ int ApiClient::handleHeaderResponse()
         if (_secClient.available() > 0)
         {
             memset(line_buff, 0, sizeof(line_buff));
-            line_len = _secClient.readline(line_buff, sizeof(line_buff) - 1);
+            line_len = _secClient.readline(line_buff, sizeof(line_buff) - 1, 0);
 
             lastDataTime = millis();
 
@@ -641,11 +645,11 @@ bool ApiClient::startStream(const char *endpoint)
     return b_status;
 }
 
-int ApiClient::readline(char *buf, size_t size)
+int ApiClient::readline(char *buf, size_t size, uint32_t timeout)
 {
     if (_secClient.available())
     {
-        return _secClient.readline(buf, size);
+        return _secClient.readline(buf, size, timeout);
     }
     return 0;
 }
@@ -669,7 +673,7 @@ bool api_get(const char *endpoint, cJSON **response, bool b_debug)
         if (httpCode > 0)
         {
             memset(response_buff, 0, sizeof(response_buff));
-            int response_len = main_client.readline(response_buff, sizeof(response_buff) - 1);
+            int response_len = main_client.readline(response_buff, sizeof(response_buff) - 1, 0);
 
             if (b_debug) {
                 LOGD("payload (%d):\r\n%s", response_len, response_buff);
@@ -697,7 +701,7 @@ bool api_get(const char *endpoint, cJSON **response, bool b_debug)
         else
         {
             LOGW("error code %d", httpCode);
-            main_client.end(true);
+            main_client.end(false);
         }
     }
 
@@ -718,7 +722,7 @@ bool api_post(const char *endpoint, const uint8_t *payload, size_t payload_len, 
         if (httpCode > 0)
         {
             memset(response_buff, 0, sizeof(response_buff));
-            int response_len = main_client.readline(response_buff, sizeof(response_buff) - 1);
+            int response_len = main_client.readline(response_buff, sizeof(response_buff) - 1, 0);
 
             if (b_debug) {
                 LOGD("response (%d): %s", response_len, response_buff);
@@ -747,7 +751,7 @@ bool api_post(const char *endpoint, const uint8_t *payload, size_t payload_len, 
         else
         {
             LOGW("error code %d", httpCode);
-            main_client.end(true);
+            main_client.end(false);
         }
 
     }

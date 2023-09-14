@@ -103,7 +103,7 @@ static int poll_events()
     {
         result  = 0;
         memset(payload_buff, 0, sizeof(payload_buff));
-        payload_len = stream_client.readline(payload_buff, sizeof(payload_buff) - 1);
+        payload_len = stream_client.readline(payload_buff, sizeof(payload_buff) - 1, 10);
 
         if (payload_len < 1)
         {
@@ -241,7 +241,7 @@ static int poll_game_state()
     {
         result  = 0;
         memset(payload_buff, 0, sizeof(payload_buff));
-        payload_len = stream_client.readline(payload_buff, sizeof(payload_buff) - 1);
+        payload_len = stream_client.readline(payload_buff, sizeof(payload_buff) - 1, 10);
 
         if (payload_len < 1)
         {
