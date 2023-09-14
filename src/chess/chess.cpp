@@ -15,7 +15,7 @@ static move_st          pending_move;
 
 static const uint8_t   *pu8_pieces = NULL;
 static uint8_t          au8_prev_pieces[64];
-static char             ac_fen_buf[80];
+static char             ac_fen_buf[FEN_BUFF_LEN];
 static bool             b_pending_led = false;
 static bool             b_skip_start_fen = false;
 static bool             b_valid_posision = false;
@@ -381,7 +381,7 @@ static inline void do_move(move_st *list, move_st *move)
         strcat(san_buf, "sm"); // stalemate
     }
 
-    LOGD("%-5s : %s", san_buf, generate_fen(&s_game));
+    LOGD("%-4s %s", san_buf, generate_fen(&s_game));
     if (BLACK == s_game.stats.turn) {
         strncpy(s_move_stack[s_game.stats.move_number - 1].san_white, san_buf, 15);
     } else {
@@ -616,12 +616,12 @@ const char *piece_to_string(uint8_t u7_type)
     return "UNKNOWN";
 }
 
-const stats_st *get_position(String &fen /*current position*/, String &move /*last move*/)
+const stats_st *get_position(char *fen /*current position*/, char *move /*last move*/)
 {
     lock();
     if (s_game.stats.valid)
     {
-        fen = generate_fen(&s_game);
+        strncpy(fen, generate_fen(&s_game), FEN_BUFF_LEN);
     }
     unlock();
 
@@ -629,36 +629,36 @@ const stats_st *get_position(String &fen /*current position*/, String &move /*la
     return &s_game.stats;
 }
 
-bool get_position(String &fen)
+bool get_position(char *fen)
 {
     bool b_status = false;
     lock();
     b_status = s_game.stats.valid;
     if (b_status)
     {
-        fen = generate_fen(&s_game);
+        strncpy(fen, generate_fen(&s_game), FEN_BUFF_LEN);
     }
     unlock();
     return b_status;
 }
 
-bool get_last_move(String &move)
+bool get_last_move(char *move)
 {
     bool b_status = false;
 
     lock();
     if (!s_game.history)
     {
-        move = "";
+        move[0] = move[1] = move[2] = move[3] = 0;
     }
     else
     {
-        move  = (char)('a' + FILE(last_move.from));
-        move += (char)('0' + 8 - RANK(last_move.from));
-        move += (char)('a' + FILE(last_move.to));
-        move += (char)('0' + 8 - RANK(last_move.to));
+        move[0] = 'a' + FILE(last_move.from);
+        move[1] = '0' + 8 - RANK(last_move.from);
+        move[2] = 'a' + FILE(last_move.to);
+        move[3] = '0' + 8 - RANK(last_move.to);
         if (last_move.flags & BIT_PROMOTION) {
-            move += (char)PIECE_TYPE(last_move.promoted);
+            move[4] = PIECE_TYPE(last_move.promoted);
         }
         b_status = true;
     }
@@ -721,15 +721,15 @@ bool continue_game(const char *expected_fen)
     return b_status;
 }
 
-bool queue_move(const String &move)
+bool queue_move(const char *move)
 {
-    //LOGD("%s(%s)", __func__, move.c_str());
-    if (move.length() > 3)
+    if (move && (strlen(move) > 3))
     {
-        char from_file = move.charAt(0);
-        char from_rank = move.charAt(1);
-        char to_file   = move.charAt(2);
-        char to_rank   = move.charAt(3);
+        //LOGD("%s", move);
+        char from_file = move[0];
+        char from_rank = move[1];
+        char to_file   = move[2];
+        char to_rank   = move[3];
         int8_t from_sq = ((7 - (from_rank - '1')) << 4) + (from_file - 'a');
         int8_t to_sq   = ((7 - (to_rank - '1')) << 4) + (to_file - 'a');
         if ((from_sq < a8) || (from_sq > h1) || (to_sq < a8) || (to_sq > h1))

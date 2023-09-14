@@ -40,6 +40,7 @@ typedef struct
     char            ac_lastmove[8];
     char            ac_fen[80];
     char            ac_state[16]; // string e_state
+    char            ac_moves[2048];
     game_state_et   e_state;
     uint32_t        u32_wtime;
     uint32_t        u32_btime;
@@ -51,7 +52,7 @@ typedef struct
 
 
 int parse_game_event(const cJSON *event, game_st *ps_game /*output*/);
-int parse_game_state(const cJSON *state, game_st *ps_game /*output*/, String &moves);
+int parse_game_state(const cJSON *state, game_st *ps_game /*output*/);
 
 bool game_move(const char *game_id, const char *move_uci);
 bool game_abort(const char *game_id);

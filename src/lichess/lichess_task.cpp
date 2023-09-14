@@ -30,9 +30,8 @@ namespace lichess
 
 static ApiClient        stream_client;  // both events-stream & board-state-stream connections
 static challenge_st     s_incoming_challenge;
-static String           str_current_moves;
-static String           str_last_move;
 static game_st          s_current_game;
+static const char      *pc_last_move = "...";
 static uint32_t         ms_last_stream; // timestamp of last receive data
 
 static char             ac_username[32];
@@ -135,17 +134,17 @@ static int poll_events()
             else
             {
                 const char *type = cJSON_GetStringValue(objtype);
-                LOGD("event %s", type);
+                //LOGD("event %s", type);
                 if (0 == strncmp(type, "game", strlen("game")))
                 {
                     result = parse_game_event(response, &s_current_game);
                     DISPLAY_CLEAR_ROW(45, SCREEN_HEIGHT-45);
                     if ((GAME_STATE_STARTED == result) && s_current_game.ac_id[0])
                     {
-                        if (str_current_moves.isEmpty()) {
+                        if (0 == s_current_game.ac_moves[0]) {
                             chess::continue_game(s_current_game.ac_fen);
                         }
-                        str_current_moves = ""; // clear starting moves
+                        memset(s_current_game.ac_moves, 0, sizeof(s_current_game.ac_moves)); // clear starting moves
                         SHOW_OPPONENT("%.17s %c", s_current_game.ac_opponent, s_current_game.b_color ? 'B' : 'W');
                         SET_BOTTOM_MENU("<-Abort      Resign->");
                         // ignore any incoming challenge
@@ -215,7 +214,7 @@ static inline void display_clock(bool b_turn, bool b_show)
         bsecs = bsecs % 60;
         //" 000:00       000:00 "
         //DISPLAY_TEXT1(0, 45, " %3u:%02u       %3u:%02u ", bmins, bsecs, wmins, wsecs);
-        DISPLAY_TEXT1(0, 45, "%3u:%02u  %-5s %3u:%02u ", bmins, bsecs, str_last_move.c_str(), wmins, wsecs);
+        DISPLAY_TEXT1(0, 45, "%3u:%02u  %-5s %3u:%02u ", bmins, bsecs, pc_last_move, wmins, wsecs);
     }
 
     if (b_turn) {
@@ -274,15 +273,15 @@ static int poll_game_state()
             else
             {
                 const char *type = cJSON_GetStringValue(objtype);
-                result = parse_game_state(response, &s_current_game, str_current_moves);
-                str_last_move = str_current_moves;
-                int sp = str_current_moves.length() ? str_current_moves.lastIndexOf(' ') : 0;
+                result = parse_game_state(response, &s_current_game);
+                pc_last_move = s_current_game.ac_moves;
+                const char *sp = strrchr(pc_last_move, ' ');
                 if (sp > 0) {
-                    str_last_move = str_current_moves.substring(sp + 1);
+                    pc_last_move = sp + 1;
                 }
-                LOGD("%s (%d) %s", type, result, str_last_move.c_str());
-                chess::queue_move(str_last_move);
-                //LOGD("%s", str_current_moves.c_str());
+                LOGD("%s (%d) %s", type, result, pc_last_move);
+                chess::queue_move(pc_last_move);
+                //LOGD("%s", s_current_game.ac_moves);
                 display_clock(s_current_game.b_turn, true);
             }
 
@@ -331,8 +330,9 @@ static void taskClient(void *)
 {
     challenge_st            s_challenge; // outgoing challenge
     const chess::stats_st  *fen_stats   = NULL;
-    String      fen, prev_fen;
-    String      last_move;
+    char        ac_fen[FEN_BUFF_LEN] = {0, }; // current board position
+    char        ac_prev_fen[FEN_BUFF_LEN] = {0, };
+    char        ac_uci_move[8] = {0, };
     bool        b_opponent_changed = false;
     uint8_t     u8_error_count   = 0;
 
@@ -393,14 +393,13 @@ static void taskClient(void *)
                 if (0 != strncmp(stream_client.getEndpoint(), "/api/board/game/stream", strlen("/api/board/game/stream")))
                 {
                     stream_client.end(true);
-                    delay(1000);
+                    delay(100);
 
-                    // api/board/game/stream/{gameId}
-                    String endpoint = "/api/board/game/stream/";
-                    endpoint += (const char *)s_current_game.ac_id;
+                    char endpoint[64]; // /api/board/game/stream/{gameId}
+                    snprintf(endpoint, sizeof(endpoint), "/api/board/game/stream/%s", s_current_game.ac_id);
 
                     SHOW_STATUS("stream game...");
-                    bool b_started = stream_client.startStream(endpoint.c_str());
+                    bool b_started = stream_client.startStream(endpoint);
 
                     if (!b_started)
                     {
@@ -463,11 +462,11 @@ static void taskClient(void *)
             break;
 
         case CLIENT_STATE_CHECK_BOARD:
-            if (fen.isEmpty() && !s_current_game.ac_id[0]) // if not yet started
+            if (!ac_fen[0] && !s_current_game.ac_id[0]) // if not yet started
             {
-                if (chess::get_position(fen))
+                if (chess::get_position(ac_fen))
                 {
-                    if (fen != START_FEN) {
+                    if (0 != strcmp(ac_fen, START_FEN)) {
                         s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
                     }
                     SHOW_OPPONENT(get_player_name(&s_challenge));
@@ -477,17 +476,17 @@ static void taskClient(void *)
             }
             else if (GAME_STATE_STARTED == s_current_game.e_state) // if has on-going game
             {
-                fen_stats = chess::get_position(fen, last_move);
-                bool b_turn = fen.indexOf('w') > 0;
+                fen_stats = chess::get_position(ac_fen, ac_uci_move);
+                bool b_turn = (NULL != strchr(ac_fen, 'w'));
 
-                if (prev_fen != fen)
+                if (0 != strncmp(ac_prev_fen, ac_fen, sizeof(ac_prev_fen)))
                 {
-                    if (!last_move.isEmpty() && (b_turn != s_current_game.b_color))
+                    if ((0 != ac_uci_move[0]) && (b_turn != s_current_game.b_color))
                     {
-                        if (game_move(s_current_game.ac_id, last_move.c_str()))
+                        if (game_move(s_current_game.ac_id, ac_uci_move))
                         {
-                            LOGD("send move %s ok", last_move.c_str());
-                            prev_fen = fen;
+                            LOGD("send move %s ok", ac_uci_move);
+                            strncpy(ac_prev_fen, ac_fen, sizeof(ac_prev_fen));
                         }
                     }
                 }
@@ -497,9 +496,9 @@ static void taskClient(void *)
             else if (s_current_game.e_state > GAME_STATE_STARTED)
             {
                 // finished
-                fen = "";
-                prev_fen = "";
-                last_move = "";
+                memset(ac_fen, 0, sizeof(ac_fen));
+                memset(ac_prev_fen, 0, sizeof(ac_prev_fen));
+                memset(ac_uci_move, 0, sizeof(ac_uci_move));
             }
             e_state = CLIENT_STATE_IDLE;
             break;
@@ -525,13 +524,13 @@ static void taskClient(void *)
                     accept_challenge(s_incoming_challenge.ac_id);
                 }
             }
-            else if (!fen.isEmpty())
+            else if (ac_fen[0])
             {
                 if (RIGHT_BTN.pressedDuration() >= 1200UL) {
                     RIGHT_BTN.resetCount();
                     if (s_challenge.e_player < PLAYER_LAST_IDX) {
                         s_challenge.e_player++;
-                        if ((s_challenge.e_player > PLAYER_AI_LEVEL_HIGH) && (fen != START_FEN)) {
+                        if ((s_challenge.e_player > PLAYER_AI_LEVEL_HIGH) && (0 != strcmp(ac_fen, START_FEN))) {
                             // allow custom position on AI opponent only
                             s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
                         }
@@ -555,7 +554,7 @@ static void taskClient(void *)
                     CLEAR_BOTTOM_MENU();
                     SET_BOTTOM_MSG("wait for opponent...");
                     s_challenge.b_color = true;
-                    if (!create_challenge(&s_challenge, fen.c_str())) {
+                    if (!create_challenge(&s_challenge, ac_fen)) {
                         SET_BOTTOM_MSG("              Retry->");
                     }
                 }
@@ -563,7 +562,7 @@ static void taskClient(void *)
                     CLEAR_BOTTOM_MENU();
                     SET_BOTTOM_MSG("wait for opponent...");
                     s_challenge.b_color = false;
-                    if (!create_challenge(&s_challenge, fen.c_str())) {
+                    if (!create_challenge(&s_challenge, ac_fen)) {
                         SET_BOTTOM_MSG("<-Retry");
                     }
                 }
@@ -594,7 +593,6 @@ void init(void)
     memset(&s_current_game, 0, sizeof(s_current_game));
     memset(ac_username, 0, sizeof(ac_username));
 
-    //stream_client.setReuse(false);
     e_state = CLIENT_STATE_INIT;
 
     if (!configs.begin("lichess", false))

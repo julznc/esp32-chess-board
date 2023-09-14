@@ -5,59 +5,62 @@
 namespace lichess
 {
 
-#define GET_NUM(o, k)           cJSON_GetNumberValue(cJSON_GetObjectItem(o, k))
-#define GET_STR(o, k)           cJSON_GetStringValue(cJSON_GetObjectItem(o, k))
-#define GET_STR2(o, k1, k2)     cJSON_GetStringValue(cJSON_GetObjectItem(cJSON_GetObjectItem(o, k1), k2))
+#define SAME_STR(s1, s2)            (0 == strcasecmp(s1, s2))
+#define GET_NUM(o, k)               cJSON_GetNumberValue(cJSON_GetObjectItem(o, k))
+#define GET_STR(o, k)               cJSON_GetStringValue(cJSON_GetObjectItem(o, k))
+#define GET_STR2(o, k1, k2)         cJSON_GetStringValue(cJSON_GetObjectItem(cJSON_GetObjectItem(o, k1), k2))
 
+static char endpoint_buff[256];
+#define SET_ENDPOINT(ep, ...)       snprintf(endpoint_buff, sizeof(endpoint_buff), ep, ## __VA_ARGS__)
 
-static inline game_stream_state_et get_stream_state(String &type)
+static inline game_stream_state_et get_stream_state(const char *type)
 {
     game_stream_state_et e_state = GAME_STREAM_STATE_UNKNOWN;
 
-    if (type == "gameFull") {
+    if (SAME_STR(type, "gameFull")) {
         e_state = GAME_STREAM_STATE_FULL;
-    } else if (type == "gameState") {
+    } else if (SAME_STR(type, "gameState")) {
         e_state = GAME_STREAM_STATE_CURRENT;
-    } else if (type == "gameFinish") {
+    } else if (SAME_STR(type, "gameFinish")) {
         e_state = GAME_STREAM_STATE_FINISH;
-    } else if (type == "chatLine") {
+    } else if (SAME_STR(type, "chatLine")) {
         e_state = GAME_STREAM_STATE_CHATLINE;
-    } else if (type == "opponentGone") {
+    } else if (SAME_STR(type, "opponentGone")) {
         e_state = GAME_STREAM_STATE_OPPONENTGONE;
     }
 
     return e_state;
 }
 
-static inline game_state_et get_state(String &status)
+static inline game_state_et get_state(const char *status)
 {
     game_state_et e_state = GAME_STATE_UNKNOWN;
 
-    if (status == "created") {
+    if (SAME_STR(status, "created")) {
         e_state = GAME_STATE_CREATED;
-    } else if (status == "started") {
+    } else if (SAME_STR(status, "started")) {
         e_state = GAME_STATE_STARTED;
-    } else if (status == "aborted") {
+    } else if (SAME_STR(status, "aborted")) {
         e_state = GAME_STATE_ABORTED;
-    } else if (status == "mate") {
+    } else if (SAME_STR(status, "mate")) {
         e_state = GAME_STATE_MATE;
-    } else if (status == "resign") {
+    } else if (SAME_STR(status, "resign")) {
         e_state = GAME_STATE_RESIGN;
-    } else if (status == "stalemate") {
+    } else if (SAME_STR(status, "stalemate")) {
         e_state = GAME_STATE_STALEMATE;
-    } else if (status == "timeout") {
+    } else if (SAME_STR(status, "timeout")) {
         e_state = GAME_STATE_TIMEOUT;
-    } else if (status == "draw") {
+    } else if (SAME_STR(status, "draw")) {
         e_state = GAME_STATE_DRAW;
-    } else if (status == "outoftime") {
+    } else if (SAME_STR(status, "outoftime")) {
         e_state = GAME_STATE_OUTOFTIME;
-    } else if (status == "cheat") {
+    } else if (SAME_STR(status, "cheat")) {
         e_state = GAME_STATE_CHEAT;
-    } else if (status == "noStart") {
+    } else if (SAME_STR(status, "noStart")) {
         e_state = GAME_STATE_NOSTART;
-    } else if (status == "unknownFinish") {
+    } else if (SAME_STR(status, "unknownFinish")) {
         e_state = GAME_STATE_UNKNOWNFINISH;
-    } else if (status == "variantEnd") {
+    } else if (SAME_STR(status, "variantEnd")) {
         e_state = GAME_STATE_VARIANTEND;
     }
 
@@ -108,39 +111,39 @@ int parse_game_event(const cJSON *event, game_st *ps_game /*output*/)
     return GAME_STATE_UNKNOWN;
 }
 
-static inline void parse_game_state_event(const cJSON *obj, game_st *ps_game, String &moves)
+static inline void parse_game_state_event(const cJSON *obj, game_st *ps_game)
 {
-    String status       = GET_STR(obj, "status");
-
-    moves               = GET_STR(obj, "moves");
+    const char *status  = GET_STR(obj, "status");
+    const char *moves   = GET_STR(obj, "moves");
     ps_game->u32_wtime  = GET_NUM(obj, "wtime");
     ps_game->u32_btime  = GET_NUM(obj, "btime");
     ps_game->u32_winc   = GET_NUM(obj, "winc");
     ps_game->u32_binc   = GET_NUM(obj, "binc");
 
-    strncpy(ps_game->ac_state, status.c_str(), sizeof(ps_game->ac_state) - 1);
+    strncpy(ps_game->ac_state, status, sizeof(ps_game->ac_state) - 1);
+    strncpy(ps_game->ac_moves, moves, sizeof(ps_game->ac_moves) - 1);
 
-    //LOGD("(%s) moves: \"%s\"", status.c_str(), moves.c_str());
+    //LOGD("(%s) moves: \"%s\"", status, moves.c_str());
 
     ps_game->e_state = get_state(status);
 }
 
-int parse_game_state(const cJSON *state, game_st *ps_game /*output*/, String &moves)
+int parse_game_state(const cJSON *state, game_st *ps_game /*output*/)
 {
     if (cJSON_HasObjectItem(state, "type"))
     {
-        String type = GET_STR(state, "type");
-        //LOGD("event %s", type.c_str());
+        const char *type = GET_STR(state, "type");
+        LOGD("event %s", type);
 
         game_stream_state_et e_type = get_stream_state(type);
         if (GAME_STREAM_STATE_FULL == e_type)
         {
             state = cJSON_GetObjectItem(state, "state");
-            parse_game_state_event(state, ps_game, moves);
+            parse_game_state_event(state, ps_game);
         }
         else if (GAME_STREAM_STATE_CURRENT == e_type)
         {
-            parse_game_state_event(state, ps_game, moves);
+            parse_game_state_event(state, ps_game);
         }
         else
         {
@@ -152,62 +155,39 @@ int parse_game_state(const cJSON *state, game_st *ps_game /*output*/, String &mo
     return GAME_STATE_UNKNOWN;
 }
 
-// api/board/game/{gameId}/move/{move}
+// /api/board/game/{gameId}/move/{move}
 bool game_move(const char *game_id, const char *move_uci)
 {
-    String endpoint = "/api/board/game/";
-
-    endpoint += game_id;
-    endpoint += "/move/";
-    endpoint += move_uci;
-
-    return api_post(endpoint.c_str());
+    SET_ENDPOINT("/api/board/game/%s/move/%s", game_id, move_uci);
+    return api_post(endpoint_buff);
 }
 
 // api/board/game/{gameId}/abort
 bool game_abort(const char *game_id)
 {
-    String endpoint = "/api/board/game/";
-
-    endpoint += game_id;
-    endpoint += "/abort";
-
-    return api_post(endpoint.c_str());
+    SET_ENDPOINT("/api/board/game/%s/abort", game_id);
+    return api_post(endpoint_buff);
 }
 
 // api/board/game/{gameId}/resign
 bool game_resign(const char *game_id)
 {
-    String endpoint = "/api/board/game/";
-
-    endpoint += game_id;
-    endpoint += "/resign";
-
-    return api_post(endpoint.c_str());
+    SET_ENDPOINT("/api/board/game/%s/resign", game_id);
+    return api_post(endpoint_buff);
 }
 
 // api/board/game/{gameId}/draw/{accept}
 bool handle_draw(const char *game_id, bool b_accept)
 {
-    String endpoint = "/api/board/game/";
-
-    endpoint += game_id;
-    endpoint += "/draw/";
-    endpoint += b_accept ? "yes" : "no";
-
-    return api_post(endpoint.c_str());
+    SET_ENDPOINT("/api/board/game/%s/draw/%s", game_id, b_accept ? "yes" : "no");
+    return api_post(endpoint_buff);
 }
 
 // api/board/game/{gameId}/takeback/{accept}
 bool handle_takeback(const char *game_id, bool b_accept)
 {
-    String endpoint = "/api/board/game/";
-
-    endpoint += game_id;
-    endpoint += "/takeback/";
-    endpoint += b_accept ? "yes" : "no";
-
-    return api_post(endpoint.c_str());
+    SET_ENDPOINT("/api/board/game/%s/takeback/%s", game_id, b_accept ? "yes" : "no");
+    return api_post(endpoint_buff);
 }
 
 } // namespace lichess

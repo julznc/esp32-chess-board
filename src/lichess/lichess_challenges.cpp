@@ -5,45 +5,58 @@
 namespace lichess
 {
 
-static inline challenge_type_et get_type(String &status)
+#define SAME_STR(s1, s2)            (0 == strcasecmp(s1, s2))
+#define GET_NUM(o, k)               cJSON_GetNumberValue(cJSON_GetObjectItem(o, k))
+#define GET_BOOL(o, k)              cJSON_IsTrue(cJSON_GetObjectItem(o, k))
+#define GET_STR(o, k)               cJSON_GetStringValue(cJSON_GetObjectItem(o, k))
+#define GET_STR2(o, k1, k2)         cJSON_GetStringValue(cJSON_GetObjectItem(cJSON_GetObjectItem(o, k1), k2))
+
+
+static char endpoint_buff[256];
+static char payload_buff[1024];
+#define SET_ENDPOINT(ep, ...)       snprintf(endpoint_buff, sizeof(endpoint_buff), ep, ## __VA_ARGS__)
+#define SET_PAYLOAD(pl, ...)        snprintf(payload_buff, sizeof(payload_buff), pl, ## __VA_ARGS__)
+
+
+static inline challenge_type_et get_type(const char *status)
 {
     challenge_type_et e_type = CHALLENGE_NONE;
 
-    if (status == "created") {
+    if (SAME_STR(status, "created")) {
         e_type = CHALLENGE_CREATED;
-    } else if (status == "accepted") {
+    } else if (SAME_STR(status,  "accepted")) {
         e_type = CHALLENGE_ACCEPTED;
-    } else if (status == "canceled") {
+    } else if (SAME_STR(status, "canceled")) {
         e_type = CHALLENGE_CANCELED;
-    } else if (status == "declined") {
+    } else if (SAME_STR(status, "declined")) {
         e_type = CHALLENGE_DECLINED;
     }
 
     return e_type;
 }
 
-static inline game_variant_et get_variant(String &variant)
+static inline game_variant_et get_variant(const char *variant)
 {
     game_variant_et e_variant = VARIANT_UNKNOWN;
 
-    if (variant == "standard") {
+    if (SAME_STR(variant, "standard")) {
         e_variant = VARIANT_STANDARD;
-    } else if (variant == "chess960") {
+    } else if (SAME_STR(variant, "chess960")) {
         //e_variant = VARIANT_CHESS960; to do
     }
 
     return e_variant;
 }
 
-static inline game_speed_et get_speed(String &speed)
+static inline game_speed_et get_speed(const char *speed)
 {
     game_speed_et e_speed = SPEED_UNKNOWN;
 
-    if (speed == "blitz") {
+    if (SAME_STR(speed, "blitz")) {
         e_speed = SPEED_BLITZ;
-    } else if (speed == "rapid") {
+    } else if (SAME_STR(speed, "rapid")) {
         e_speed = SPEED_RAPID;
-    } else if (speed == "classical") {
+    } else if (SAME_STR(speed, "classical")) {
         e_speed = SPEED_CLASSICAL;
     }
 
@@ -64,37 +77,32 @@ int parse_challenge_event(const cJSON *event, challenge_st *ps_challenge)
         }
         else
         {
-          #define GET_NUM(o, k)         cJSON_GetNumberValue(cJSON_GetObjectItem(o, k))
-          #define GET_BOOL(o, k)        cJSON_IsTrue(cJSON_GetObjectItem(o, k))
-          #define GET_STR(o, k)         cJSON_GetStringValue(cJSON_GetObjectItem(o, k))
-          #define GET_STR2(o, k1, k2)   cJSON_GetStringValue(cJSON_GetObjectItem(cJSON_GetObjectItem(o, k1), k2))
-
-            const  char *id     = GET_STR(obj, "id");
-            bool   b_rated      = GET_BOOL(obj, "rated");
-            String status       = GET_STR(obj, "status");
-            String challenger   = GET_STR2(obj, "challenger", "name");
-            String destUser     = GET_STR2(obj, "destUser", "name");
-            String variant      = GET_STR2(obj, "variant", "name");
-            String speed        = GET_STR(obj, "speed");
-            String color        = GET_STR(obj, "color");
-            const cJSON *timectl= cJSON_GetObjectItem(obj, "timeControl");
+            const char *id          = GET_STR(obj, "id");
+            bool   b_rated          = GET_BOOL(obj, "rated");
+            const char *status      = GET_STR(obj, "status");
+            const char *challenger  = GET_STR2(obj, "challenger", "name");
+            const char *destUser    = GET_STR2(obj, "destUser", "name");
+            const char *variant     = GET_STR2(obj, "variant", "name");
+          //const char *speed       = GET_STR(obj, "speed");
+            const char *color       = GET_STR(obj, "color");
+            const cJSON *timectl    = cJSON_GetObjectItem(obj, "timeControl");
 
             if (color == "random") {
                 color = GET_STR(obj, "finalColor");
             }
 
-            //LOGD("%s %s by %s to %s", status.c_str(), id, challenger.c_str(), destUser.c_str());
+            LOGD("%s %s by %s to %s", status, id, challenger, destUser);
 
             challenge_type_et e_type = get_type(status);
 
             if (CHALLENGE_CREATED == e_type)
             {
                 strncpy(ps_challenge->ac_id, id, sizeof(ps_challenge->ac_id));
-                strncpy(ps_challenge->ac_user, challenger.c_str(), sizeof(ps_challenge->ac_user));
+                strncpy(ps_challenge->ac_user, challenger, sizeof(ps_challenge->ac_user));
                 ps_challenge->e_variant = get_variant(variant);
                 ps_challenge->e_speed   = get_speed(variant);
                 ps_challenge->b_rated   = b_rated;
-                ps_challenge->b_color   = (color == "white");
+                ps_challenge->b_color   = 'w' == color[0];
                 ps_challenge->u16_clock_limit    = GET_NUM(timectl, "limit");
                 ps_challenge->u8_clock_increment = GET_NUM(timectl, "increment");
             }
@@ -108,80 +116,66 @@ int parse_challenge_event(const cJSON *event, challenge_st *ps_challenge)
 
 bool accept_challenge(const char *challenge_id)
 {
-    String endpoint = "/api/challenge/";
     //LOGD("%s(%s)", __func__, challenge_id);
 
-    endpoint += challenge_id;
-    endpoint += "/accept";
-
-    return api_post(endpoint.c_str());
+    SET_ENDPOINT("/api/challenge/%s/accept", challenge_id);
+    return api_post(endpoint_buff);
 }
 
 bool decline_challenge(const char *challenge_id, const char *reason)
 {
-    String endpoint = "/api/challenge/";
-    String payload  = "reason=";
     //LOGD("%s(%s)", __func__, challenge_id);
 
-    endpoint += challenge_id;
-    endpoint += "/decline";
-    payload  += reason ? reason : "generic";
-
-    return api_post(endpoint.c_str(), (const uint8_t *)payload.c_str(), payload.length());
+    SET_ENDPOINT("/api/challenge/%s/decline", challenge_id);
+    if (NULL == reason) {
+        reason = "generic";
+    }
+    return api_post(endpoint_buff, (const uint8_t *)reason, strlen(reason));
 }
 
 bool create_seek(const challenge_st *ps_challenge)
 {
-    String endpoint = "/api/board/seek";
-    String payload  = "";
+    int len = SET_PAYLOAD("rated=%s&time=%u&increment=%u&variant=standard&color=%s",
+                        ps_challenge->b_rated ? "true" : "false",
+                        ps_challenge->u16_clock_limit / 60, // in minutes
+                        ps_challenge->u8_clock_increment,   // in seconds
+                        ps_challenge->b_color ? "white" : "black");
 
-    payload += ps_challenge->b_rated ? "rated=true" : "rated=false";
-    payload += "&time=";
-    payload += ps_challenge->u16_clock_limit / 60;  // in minutes
-    payload += "&increment=";
-    payload += ps_challenge->u8_clock_increment;    // in seconds
-    payload += "&variant=standard";
-    payload += ps_challenge->b_color ? "&color=white" : "&color=black";
-
-    LOGD("play as %s vs %s: %s\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, endpoint.c_str(), payload.c_str());
-    return api_post(endpoint.c_str(), (const uint8_t *)payload.c_str(), payload.length());
+    LOGD("play as %s vs %s:\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, payload_buff);
+    return api_post("/api/board/seek", (const uint8_t *)payload_buff, len);
 }
 
 bool create_challenge(const challenge_st *ps_challenge, const char *fen)
 {
-    String endpoint = "/api/challenge/";
-    String payload  = "";
+    int payload_len = 0;
 
-    endpoint += ps_challenge->ac_user;
+    SET_ENDPOINT("/api/challenge/%s", ps_challenge->ac_user);
 
     if (ps_challenge->e_player <= PLAYER_AI_LEVEL_HIGH)
     {
-        payload += "level=";
-        payload += (PLAYER_AI_LEVEL_HIGH == ps_challenge->e_player) ? (8) : ((PLAYER_AI_LEVEL_MEDIUM == ps_challenge->e_player) ? (5) : (2));
-        payload += "&fen=";
-        payload += fen;
+        payload_len = SET_PAYLOAD("level=%d&fen=%s",
+                        (PLAYER_AI_LEVEL_HIGH == ps_challenge->e_player) ? (8) : ((PLAYER_AI_LEVEL_MEDIUM == ps_challenge->e_player) ? (5) : (2)),
+                        fen);
     }
     else if ((PLAYER_BOT_MAIA9 == ps_challenge->e_player) || (PLAYER_CUSTOM == ps_challenge->e_player))
     {
-        payload += ps_challenge->b_rated ? "rated=true" : "rated=false";
-        payload += "&keepAliveStream=false";
-        payload += "&rules=noRematch,noClaimWin,noEarlyDraw";
+        payload_len = SET_PAYLOAD("rated=%s&keepAliveStream=%s&rules=%s",
+                        ps_challenge->b_rated ? "true" : "false", "false", "noRematch,noClaimWin,noEarlyDraw");
     }
     else
     {
         return create_seek(ps_challenge);
     }
 
-    payload += "&clock.limit=";
-    payload += ps_challenge->u16_clock_limit;
-    payload += "&clock.increment=";
-    payload += ps_challenge->u8_clock_increment;
-    payload += ps_challenge->b_color ? "&color=white" : "&color=black";
-    payload += "&variant=standard";
+    payload_len += snprintf(payload_buff + payload_len, sizeof(payload_buff) - payload_len,
+                            "&clock.limit=%u&clock.increment=%u&color=%s&variant=%s",
+                            ps_challenge->u16_clock_limit,
+                            ps_challenge->u8_clock_increment,
+                            ps_challenge->b_color ? "white" : "black",
+                            "standard");
 
-    //payload.replace(" ", "%20");
-    LOGD("play as %s vs %s: %s\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, endpoint.c_str(), payload.c_str());
-    return api_post(endpoint.c_str(), (const uint8_t *)payload.c_str(), payload.length());
+    LOGD("play as %s vs %s:\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, payload_buff);
+    return api_post(endpoint_buff, (const uint8_t *)payload_buff, payload_len);
 }
 
 bool cancel_challenge(const char *challenge_id)

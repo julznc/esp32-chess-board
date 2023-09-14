@@ -32,6 +32,7 @@ typedef enum {
                                          (chess::ROOK==u7_type) || (chess::QUEEN==u7_type)  || (chess::KING==u7_type))
 
 #define START_FEN                       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+#define FEN_BUFF_LEN                    (80)
 #define IS_START_FEN(fen)               (0 == strncmp(fen, START_FEN, 43))
 
 typedef enum {
@@ -129,12 +130,12 @@ const char *color_to_string(uint8_t b_color);
 const char *piece_to_string(uint8_t u7_type);
 
 // api's
-const stats_st *get_position(String &fen /*current position*/, String &move /*last uci move*/);
-bool get_position(String &fen);
-bool get_last_move(String &move /*uci*/);
+const stats_st *get_position(char *fen /*current position*/, char *move /*last uci move*/);
+bool get_position(char *fen);
+bool get_last_move(char *move /*uci*/);
 bool get_pgn(String &pgn);
 bool continue_game(const char *expected_fen); // continue game from position
-bool queue_move(const String &move);
+bool queue_move(const char *move);
 
 
 } // namespace chess
