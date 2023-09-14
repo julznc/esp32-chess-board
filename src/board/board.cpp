@@ -58,6 +58,7 @@ static bool checkSquares(void)
     static const uint8_t FILE_START = 0;
     static const uint8_t FILE_END   = 3;
 #endif
+    static const uint8_t expected_rxgain = 0x40; // default RxGain is 0x40 (33dB)
     bool b_complete = true;
 
     for (uint8_t rank = RANK_START; b_complete && (rank <= RANK_END); rank++)
@@ -82,12 +83,18 @@ static bool checkSquares(void)
                 ui::leds::clear();
                 ui::leds::setColor(rank, file, ui::leds::LED_RED);
                 b_complete = false;
+                break;
             }
-            else
+
+            uint8_t rxgain = rc522.PCD_GetAntennaGain();
+            if (expected_rxgain != rxgain) // defective reader chip?
             {
-                //LOGD("found %c%u v%02X", 'a' + file, rank + 1, u8_version);
-                ui::leds::setColor(rank, file, ui::leds::LED_GREEN);
+                LOGW("rxgain = 0x%02x on %c%u", rxgain, 'a' + u8_selected_file, u8_selected_rank + 1);
+                rc522.PCD_WriteRegister(MFRC522::RFCfgReg, expected_rxgain);
             }
+
+            //LOGD("found %c%u v%02X", 'a' + file, rank + 1, u8_version);
+            ui::leds::setColor(rank, file, ui::leds::LED_GREEN);
         }
 
         ui::leds::update();
@@ -139,16 +146,22 @@ static inline void square_init(void)
 #if 0
     rc522.PCD_Init();
 #else
-    uint8_t u8_cmdreg = 0;
-    uint8_t u8_count  = 0;
+    // wait for 150ms to be ready
+    uint32_t    ms_timeout  = millis() + 150;
+    uint8_t     u8_cmdreg   = 0;
 
-    // wait for 100ms to be ready
-    while (((u8_cmdreg = rc522.PCD_ReadRegister(MFRC522::CommandReg)) & 0x10) && (++u8_count < 100)){
+    // do soft-reset
+    rc522.PCD_WriteRegister(MFRC522::CommandReg, MFRC522::PCD_SoftReset);
+    do {
         delay(1);
-    }
+        u8_cmdreg = rc522.PCD_ReadRegister(MFRC522::CommandReg);
+        if (0 == (u8_cmdreg & 0x10)) { // check if powerdown bit is cleared
+            break; // reader is now ready
+        }
+    } while (millis() < ms_timeout);
 
-    if (u8_cmdreg & 10) {
-        //LOGW("%c%u not ready (%02x)", 'a' + u8_selected_file, u8_selected_rank + 1, u8_cmdreg);
+    if (0 != (u8_cmdreg & 10)) {
+        LOGW("square %c%u not ready (cmdreg 0x%02x)", 'a' + u8_selected_file, u8_selected_rank + 1, u8_cmdreg);
     }
 
     rc522.PCD_WriteRegister(MFRC522::TModeReg, 0x80);
@@ -205,11 +218,11 @@ static inline uint8_t read_piece(uint16_t u8_expected_piece, uint8_t u8_retry, b
         {
             if (u8_retry > 0)
             {
-                return read_piece(u8_expected_piece, --u8_retry, false);
+                return read_piece(u8_expected_piece, --u8_retry, u8_retry & 1);
             }
             else
             {
-                //LOGW("removed %c on %c%u?", u8_expected_piece, 'a' + u8_selected_file, u8_selected_rank + 1);
+                //LOGD("removed %c on %c%u?", u8_expected_piece, 'a' + u8_selected_file, u8_selected_rank + 1);
             }
         }
     }
