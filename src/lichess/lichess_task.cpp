@@ -84,7 +84,8 @@ static bool get_account()
 
 static int poll_events()
 {
-    String  payload;
+    char    payload_buff[1024];
+    int     payload_len = 0;
     String  endpoint = stream_client.getEndpoint();
     int     result = -1;
 
@@ -95,14 +96,16 @@ static int poll_events()
 
     while (stream_client.connected())
     {
-        payload = stream_client.readLine();
         result  = 0;
+        memset(payload_buff, 0, sizeof(payload_buff));
+        payload_len = stream_client.readline(payload_buff, sizeof(payload_buff) - 1);
 
-        if (0 == payload.length())
+        if (payload_len < 1)
         {
             if (millis() - ms_last_stream > (6000UL + 500)) // should receive every 6 seconds
             {
                 LOGW("no data received (%lums)", millis() - ms_last_stream);
+                stream_client.end(true);
                 result = -1;
             }
             break; // empty
@@ -110,11 +113,11 @@ static int poll_events()
 
         ms_last_stream = millis();
 
-        if (payload.length() > 8 /* {"x":"y"} */)
+        if (payload_len > 8 /* {"x":"y"} */)
         {
-            LOGD("payload (%u): %s", payload.length(), payload.c_str());
+            LOGD("payload (%d): %s", payload_len, payload_buff);
             response.clear();
-            DeserializationError error = deserializeJson(response, payload);
+            DeserializationError error = deserializeJson(response, payload_buff);
             if (error)
             {
                 LOGW("deserializeJson() failed: %s", error.f_str());
@@ -214,7 +217,8 @@ static inline void display_clock(bool b_turn, bool b_show)
 
 static int poll_game_state()
 {
-    String  payload;
+    char    payload_buff[1024];
+    int     payload_len = 0;
     String  endpoint = stream_client.getEndpoint();
     int     result = -1;
 
@@ -225,14 +229,16 @@ static int poll_game_state()
 
     while (stream_client.connected())
     {
-        payload = stream_client.readLine();
         result  = 0;
+        memset(payload_buff, 0, sizeof(payload_buff));
+        payload_len = stream_client.readline(payload_buff, sizeof(payload_buff) - 1);
 
-        if (0 == payload.length())
+        if (payload_len < 1)
         {
             if (millis() - ms_last_stream > (6000UL + 500)) // should receive every 6 seconds
             {
                 LOGW("no data received (%lums)", millis() - ms_last_stream);
+                stream_client.end(true);
                 result = -1;
             }
             break; // empty
@@ -240,11 +246,11 @@ static int poll_game_state()
 
         ms_last_stream = millis();
 
-        if (payload.length() > 8 /* {"x":"y"} */)
+        if (payload_len > 8 /* {"x":"y"} */)
         {
-            //LOGD("payload (%u): %s", payload.length(), payload.c_str());
+            LOGD("payload (%d): %s", payload_len, payload_buff);
             response.clear();
-            DeserializationError error = deserializeJson(response, payload);
+            DeserializationError error = deserializeJson(response, payload_buff);
             if (error)
             {
                 LOGW("deserializeJson() failed: %s", error.f_str());
@@ -327,8 +333,6 @@ static void taskClient(void *)
     {
         WDT_FEED();
 
-        int event = EVENT_UNKNOWN;
-
         switch (e_state)
         {
         case CLIENT_STATE_INIT:
@@ -368,12 +372,7 @@ static void taskClient(void *)
             break;
 
         case CLIENT_STATE_CHECK_EVENTS:
-            event = poll_events();
-            if (event < 0)
-            {
-                e_state = CLIENT_STATE_INIT;
-            }
-            else if (s_current_game.ac_id[0])
+            if (s_current_game.ac_id[0])
             {
                 if (!stream_client.getEndpoint().startsWith("/api/board/game/stream"))
                 {
@@ -403,6 +402,10 @@ static void taskClient(void *)
                     SHOW_STATUS("game: %.*s", 14, s_current_game.ac_id);
                 }
                 e_state = CLIENT_STATE_CHECK_GAME;
+            }
+            else if (poll_events() < 0)
+            {
+                e_state = CLIENT_STATE_INIT;
             }
             else
             {
@@ -575,7 +578,7 @@ void init(void)
     memset(&s_current_game, 0, sizeof(s_current_game));
     memset(ac_username, 0, sizeof(ac_username));
 
-    stream_client.setReuse(false);
+    //stream_client.setReuse(false);
     e_state = CLIENT_STATE_INIT;
 
     if (!configs.begin("lichess", false))

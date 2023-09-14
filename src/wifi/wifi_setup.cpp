@@ -1,6 +1,6 @@
 #include <atomic>
 #include <Preferences.h>
-#include <sntp.h>
+#include <esp_sntp.h>
 #include <esp_wifi.h>
 
 #include "globals.h"

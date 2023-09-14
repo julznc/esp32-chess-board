@@ -7,11 +7,12 @@
  */
 static const char      *LICHESS_API_HOST            = "lichess.org";
 static const char      *LICHESS_API_PROTOCOL        = "https";
-static const uint16_t   LICHESS_API_PORT            = 443; // default port
+static const uint16_t   LICHESS_API_PORT            = 443;  // default port
 
 /**
  * configurable
  */
+static const uint16_t   LICHESS_API_TIMEOUT_MS      = 8000; // 8-second timeout
 static const char      *LICHESS_ORG_PEM =
 R"rawliteral(-----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
