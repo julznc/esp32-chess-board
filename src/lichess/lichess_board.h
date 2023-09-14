@@ -1,7 +1,6 @@
 #ifndef __LICHESS_BOARD_API_H__
 #define __LICHESS_BOARD_API_H__
 
-
 namespace lichess
 {
 
@@ -51,8 +50,8 @@ typedef struct
 } game_st;
 
 
-int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/);
-int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/, String &moves);
+int parse_game_event(const cJSON *event, game_st *ps_game /*output*/);
+int parse_game_state(const cJSON *state, game_st *ps_game /*output*/, String &moves);
 
 bool game_move(const char *game_id, const char *move_uci);
 bool game_abort(const char *game_id);

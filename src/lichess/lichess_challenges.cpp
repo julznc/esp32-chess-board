@@ -2,12 +2,8 @@
 #include "globals.h"
 #include "lichess_api.h"
 
-
 namespace lichess
 {
-
-static DynamicJsonDocument  _rsp(2*1024);
-
 
 static inline challenge_type_et get_type(String &status)
 {
@@ -54,32 +50,37 @@ static inline game_speed_et get_speed(String &speed)
     return e_speed;
 }
 
-int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge)
+int parse_challenge_event(const cJSON *event, challenge_st *ps_challenge)
 {
-    if (json.containsKey("challenge"))
+    const cJSON *obj = cJSON_GetObjectItem(event, "challenge");
+    if (NULL != obj)
     {
-        JsonObject obj = json["challenge"].as<JsonObject>();
-        if (!obj.containsKey("id")          || !obj.containsKey("status")   ||
-            !obj.containsKey("challenger")  || !obj.containsKey("destUser") ||
-            !obj.containsKey("variant")     || !obj.containsKey("rated")    ||
-            !obj.containsKey("speed")       || !obj.containsKey("timeControl"))
+        if (!cJSON_HasObjectItem(obj, "id")         || !cJSON_HasObjectItem(obj, "status")   ||
+            !cJSON_HasObjectItem(obj, "challenger") || !cJSON_HasObjectItem(obj, "destUser") ||
+            !cJSON_HasObjectItem(obj, "variant")    || !cJSON_HasObjectItem(obj, "rated")    ||
+            !cJSON_HasObjectItem(obj, "speed")      || !cJSON_HasObjectItem(obj, "timeControl"))
         {
             LOGW("incomplete info");
         }
         else
         {
-            const  char *id     = obj["id"].as<const char*>();
-            bool   b_rated      = obj["rated"];
-            String status       = obj["status"].as<const char*>();
-            String challenger   = obj["challenger"].as<JsonObject>()["name"];
-            String destUser     = obj["destUser"].as<JsonObject>()["name"];
-            String variant      = obj["variant"].as<JsonObject>()["name"];
-            String speed        = obj["speed"].as<const char*>();
-            String color        = obj["color"].as<const char*>();
-            JsonObject timectl  = obj["timeControl"].as<JsonObject>();
+          #define GET_NUM(o, k)         cJSON_GetNumberValue(cJSON_GetObjectItem(o, k))
+          #define GET_BOOL(o, k)        cJSON_IsTrue(cJSON_GetObjectItem(o, k))
+          #define GET_STR(o, k)         cJSON_GetStringValue(cJSON_GetObjectItem(o, k))
+          #define GET_STR2(o, k1, k2)   cJSON_GetStringValue(cJSON_GetObjectItem(cJSON_GetObjectItem(o, k1), k2))
+
+            const  char *id     = GET_STR(obj, "id");
+            bool   b_rated      = GET_BOOL(obj, "rated");
+            String status       = GET_STR(obj, "status");
+            String challenger   = GET_STR2(obj, "challenger", "name");
+            String destUser     = GET_STR2(obj, "destUser", "name");
+            String variant      = GET_STR2(obj, "variant", "name");
+            String speed        = GET_STR(obj, "speed");
+            String color        = GET_STR(obj, "color");
+            const cJSON *timectl= cJSON_GetObjectItem(obj, "timeControl");
 
             if (color == "random") {
-                color = obj["finalColor"].as<const char*>();
+                color = GET_STR(obj, "finalColor");
             }
 
             //LOGD("%s %s by %s to %s", status.c_str(), id, challenger.c_str(), destUser.c_str());
@@ -94,8 +95,8 @@ int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge)
                 ps_challenge->e_speed   = get_speed(variant);
                 ps_challenge->b_rated   = b_rated;
                 ps_challenge->b_color   = (color == "white");
-                ps_challenge->u16_clock_limit    = timectl["limit"].as<uint16_t>();
-                ps_challenge->u8_clock_increment = timectl["increment"].as<uint8_t>();
+                ps_challenge->u16_clock_limit    = GET_NUM(timectl, "limit");
+                ps_challenge->u8_clock_increment = GET_NUM(timectl, "increment");
             }
 
             return e_type;
@@ -113,7 +114,7 @@ bool accept_challenge(const char *challenge_id)
     endpoint += challenge_id;
     endpoint += "/accept";
 
-    return api_post(endpoint.c_str(), "", _rsp, true);
+    return api_post(endpoint.c_str());
 }
 
 bool decline_challenge(const char *challenge_id, const char *reason)
@@ -126,7 +127,7 @@ bool decline_challenge(const char *challenge_id, const char *reason)
     endpoint += "/decline";
     payload  += reason ? reason : "generic";
 
-    return api_post(endpoint.c_str(), payload, _rsp, true);
+    return api_post(endpoint.c_str(), (const uint8_t *)payload.c_str(), payload.length());
 }
 
 bool create_seek(const challenge_st *ps_challenge)
@@ -143,7 +144,7 @@ bool create_seek(const challenge_st *ps_challenge)
     payload += ps_challenge->b_color ? "&color=white" : "&color=black";
 
     LOGD("play as %s vs %s: %s\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, endpoint.c_str(), payload.c_str());
-    return api_post(endpoint.c_str(), payload, _rsp, true);
+    return api_post(endpoint.c_str(), (const uint8_t *)payload.c_str(), payload.length());
 }
 
 bool create_challenge(const challenge_st *ps_challenge, const char *fen)
@@ -180,7 +181,7 @@ bool create_challenge(const challenge_st *ps_challenge, const char *fen)
 
     //payload.replace(" ", "%20");
     LOGD("play as %s vs %s: %s\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, endpoint.c_str(), payload.c_str());
-    return api_post(endpoint.c_str(), payload, _rsp, true);
+    return api_post(endpoint.c_str(), (const uint8_t *)payload.c_str(), payload.length());
 }
 
 bool cancel_challenge(const char *challenge_id)

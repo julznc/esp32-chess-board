@@ -13,6 +13,7 @@ namespace lichess
 {
 
 static  ApiClient   main_client;    // main connection (non-stream'ed)
+static  char        response_buff[2048];
 int     ApiClient::num_connect_errors = 0;
 
 
@@ -408,34 +409,26 @@ int ApiClient::SecClient::send_ssl(const uint8_t *data, size_t len)
 
 ApiClient::ApiClient()
 {
-    //
+    memset(_auth, 0, sizeof(_auth));
+    memset(_uri, 0, sizeof(_uri));
 }
 
 bool ApiClient::begin(const char *endpoint)
 {
-    String token;
-
-    get_token(token);
-
-    if (token.isEmpty())
+    if (0 == _auth[0])
     {
-        LOGW("unknown access");
-        return false;
+        char token[64];
+        if (!get_token(token, sizeof(token) - 1))
+        {
+            LOGW("unknown access");
+            return false;
+        }
+        snprintf(_auth, sizeof(_auth) - 1, "Bearer %s", token);
+        LOGI("auth: %s", token);
     }
 
-    _auth       = "Bearer ";
-    _auth      += token;
-
-    //_client     = &_secClient;
-    //_secure     = true;
-
-    //_protocol   = LICHESS_API_PROTOCOL;
-    //_host       = LICHESS_API_HOST;
-    //_port       = LICHESS_API_PORT;
-    _uri        = endpoint;
-
-    //LOGD("protocol: %s, host: %s port: %d url: %s", _protocol.c_str(), _host.c_str(), _port, _uri.c_str());
-    LOGD("%s", _uri.c_str());
+    strncpy(_uri, endpoint, sizeof(_uri));
+    LOGD("%s", _uri);
 
     return true;
 }
@@ -486,7 +479,7 @@ void ApiClient::end(bool b_stop)
     if (b_stop) {
         _secClient.stop();
     }
-    _uri = "";
+    memset(_uri, 0, sizeof(_uri));
     _returnCode = 0;
     _size = -1;
 }
@@ -500,11 +493,11 @@ bool ApiClient::sendHeader(const char *type, size_t content_length)
     {
   #define ADD_HEADER(hdr, ...)    header_len += snprintf(header_buf + header_len, sizeof(header_buf) - header_len, hdr "\r\n", ## __VA_ARGS__)
 
-        ADD_HEADER("%s %s HTTP/1.1", type, _uri.c_str());
+        ADD_HEADER("%s %s HTTP/1.1", type, _uri);
         ADD_HEADER("Host: %s", LICHESS_API_HOST);
         ADD_HEADER("Connection: %s", "keep-alive");
         //ADD_HEADER("User-Agent: %s", "esp32-chess-board");
-        ADD_HEADER("Authorization: %s", _auth.c_str());
+        ADD_HEADER("Authorization: %s", _auth);
         if (content_length) {
             ADD_HEADER("Content-Type: %s", "application/x-www-form-urlencoded");
             ADD_HEADER("Content-Length: %ld", content_length);
@@ -541,7 +534,7 @@ int ApiClient::handleHeaderResponse()
 
             if (0 == strncmp(line_buff, "HTTP", 4)) // first line
             {
-                LOGD("%s", line_buff);
+                //LOGD("%s", line_buff);
                 if (NULL != (sep = strchr(line_buff, ' '))) {
                     _returnCode = atoi(sep + 1);
                 }
@@ -563,7 +556,7 @@ int ApiClient::handleHeaderResponse()
             else if (0 == line_len)
             {
                 if (_size > 0) {
-                    LOGD("size: %d", _size);
+                    //LOGD("size: %d", _size);
                 }
 
                 if (_returnCode) {
@@ -585,7 +578,7 @@ int ApiClient::handleHeaderResponse()
     return HTTPC_ERROR_CONNECTION_LOST;
 }
 
-int ApiClient::sendRequest(const char *type, uint8_t *payload, size_t size)
+int ApiClient::sendRequest(const char *type, const uint8_t *payload, size_t size)
 {
     int code = 0;
 
@@ -603,7 +596,7 @@ int ApiClient::sendRequest(const char *type, uint8_t *payload, size_t size)
             code = HTTPC_ERROR_SEND_HEADER_FAILED;
         }
         // send payload if needed
-        else if (payload && (size > 0) && (_secClient.write(&payload[0], size) != size))
+        else if (payload && (size > 0) && (_secClient.write(payload, size) != size))
         {
             LOGW("send payload failed");
             code = HTTPC_ERROR_SEND_PAYLOAD_FAILED;
@@ -661,11 +654,10 @@ int ApiClient::readline(char *buf, size_t size)
 /*
  * Private Functions
  */
-bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
+
+bool api_get(const char *endpoint, cJSON **response, bool b_debug)
 {
-    char    response_buff[1024];
-    int     response_len = 0;
-    bool    b_status     = false;
+    bool b_status = false;
 
     if (!main_client.begin(endpoint))
     {
@@ -677,21 +669,19 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
         if (httpCode > 0)
         {
             memset(response_buff, 0, sizeof(response_buff));
-            response_len = main_client.readline(response_buff, sizeof(response_buff) - 1);
+            int response_len = main_client.readline(response_buff, sizeof(response_buff) - 1);
 
             if (b_debug) {
                 LOGD("payload (%d):\r\n%s", response_len, response_buff);
             }
 
-            if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))
+            if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_BAD_REQUEST == httpCode))
             {
                 if (response_len > 0)
                 {
-                    json.clear();
-                    DeserializationError error = deserializeJson(json, (const char *)response_buff);
-                    if (error)
+                    if ((NULL != response) && (NULL == (*response = cJSON_Parse(response_buff))))
                     {
-                        LOGW("deserializeJson() failed: %s", error.f_str());
+                        LOGW("parse json failed (%s)", cJSON_GetErrorPtr());
                     }
                     else
                     {
@@ -714,11 +704,9 @@ bool api_get(const char *endpoint, DynamicJsonDocument &json, bool b_debug)
     return b_status;
 }
 
-bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, bool b_debug)
+bool api_post(const char *endpoint, const uint8_t *payload, size_t payload_len, cJSON **response, bool b_debug)
 {
-    char    response_buff[1024];
-    int     response_len = 0;
-    bool    b_status     = false;
+    bool b_status = false;
 
     if (!main_client.begin(endpoint))
     {
@@ -726,11 +714,11 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
     }
     else
     {
-        int httpCode = main_client.sendRequest("POST", (uint8_t *)payload.c_str(), payload.length());
+        int httpCode = main_client.sendRequest("POST", payload, payload_len);
         if (httpCode > 0)
         {
             memset(response_buff, 0, sizeof(response_buff));
-            response_len = main_client.readline(response_buff, sizeof(response_buff) - 1);
+            int response_len = main_client.readline(response_buff, sizeof(response_buff) - 1);
 
             if (b_debug) {
                 LOGD("response (%d): %s", response_len, response_buff);
@@ -741,11 +729,9 @@ bool api_post(const char *endpoint, String payload, DynamicJsonDocument &json, b
             {
                 if (response_len > 0)
                 {
-                    json.clear();
-                    DeserializationError error = deserializeJson(json, (const char *)response_buff);
-                    if (error)
+                    if ((NULL != response) && (NULL == (*response = cJSON_Parse(response_buff))))
                     {
-                        LOGW("deserializeJson() failed: %s", error.f_str());
+                        LOGW("parse json failed (%s)", cJSON_GetErrorPtr());
                     }
                     else
                     {

@@ -1,8 +1,6 @@
 #ifndef __LICHESS_CHALLENGES_API_H__
 #define __LICHESS_CHALLENGES_API_H__
 
-#include <ArduinoJson.h>
-
 
 namespace lichess
 {
@@ -80,7 +78,7 @@ typedef struct
 
 
 // return challenge_type_st or negative for error
-int parse_challenge_event(DynamicJsonDocument &json, challenge_st *ps_challenge /*output*/);
+int parse_challenge_event(const cJSON *event, challenge_st *ps_challenge /*output*/);
 
 bool accept_challenge(const char *challenge_id);
 bool decline_challenge(const char *challenge_id, const char *reason=NULL);

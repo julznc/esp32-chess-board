@@ -8,7 +8,7 @@
 #include <mbedtls/entropy.h>
 #include <mbedtls/ssl.h>
 
-#include <ArduinoJson.h>
+#include <cJSON.h>
 #include <WiFi.h>
 
 #include "lichess_api.h"
@@ -89,22 +89,21 @@ public:
     bool connect(void);
     bool connected();
     void end(bool b_stop /*close ssl connection*/);
-    int sendRequest(const char *type, uint8_t *payload=NULL, size_t size=0);
+    int sendRequest(const char *type, const uint8_t *payload=NULL, size_t size=0);
     bool startStream(const char *endpoint);
     int readline(char *buf, size_t size);
-
-    const String &getEndpoint(void) const { return _uri; }
+    const char *getEndpoint() const { return _uri; }
 
 protected:
     bool sendHeader(const char *type, size_t content_length=0);
     int handleHeaderResponse();
 
 private:
-    String      _auth;
-    String      _uri;
+    SecClient   _secClient;
+    char        _auth[80];
+    char        _uri[128];
     int         _returnCode = 0;
     int         _size = -1;
-    SecClient   _secClient;
     static int  num_connect_errors;
 };
 
@@ -126,6 +125,7 @@ void init(void);
 bool get_username(String &name);
 size_t set_token(const char *token);
 bool get_token(String &token);
+bool get_token(char *token, size_t len);
 bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clock_increment, bool b_rated);
 bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_clock_increment, bool &b_rated);
 
@@ -133,8 +133,8 @@ bool get_game_options(String &opponent, uint16_t &u16_clock_limit, uint8_t &u8_c
 /*
  * Private Function Prototypes
  */
-bool api_get(const char *endpoint, DynamicJsonDocument &response, bool b_debug=false);
-bool api_post(const char *endpoint, String payload, DynamicJsonDocument &response, bool b_debug=false);
+bool api_get(const char *endpoint, cJSON **response, bool b_debug=true);
+bool api_post(const char *endpoint, const uint8_t *payload=NULL, size_t payload_len=0, cJSON **response=NULL, bool b_debug=true);
 
 } // namespace lichess
 

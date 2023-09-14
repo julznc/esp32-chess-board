@@ -2,11 +2,12 @@
 #include "globals.h"
 #include "lichess_api.h"
 
-
 namespace lichess
 {
 
-static DynamicJsonDocument  _rsp(2*1024);
+#define GET_NUM(o, k)           cJSON_GetNumberValue(cJSON_GetObjectItem(o, k))
+#define GET_STR(o, k)           cJSON_GetStringValue(cJSON_GetObjectItem(o, k))
+#define GET_STR2(o, k1, k2)     cJSON_GetStringValue(cJSON_GetObjectItem(cJSON_GetObjectItem(o, k1), k2))
 
 
 static inline game_stream_state_et get_stream_state(String &type)
@@ -63,31 +64,30 @@ static inline game_state_et get_state(String &status)
     return e_state;
 }
 
-int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/)
+int parse_game_event(const cJSON *event, game_st *ps_game /*output*/)
 {
-    if (json.containsKey("game"))
+    const cJSON *obj = cJSON_GetObjectItem(event, "game");
+    if (NULL != obj)
     {
-        JsonObject obj = json["game"].as<JsonObject>();
-        if (!obj.containsKey("id") || !obj.containsKey("status"))
+        if (!cJSON_HasObjectItem(obj, "id") || !cJSON_HasObjectItem(obj, "status"))
         {
             LOGW("incomplete game info");
         }
         else
         {
-            const char *id    = obj["id"].as<const char*>();
-            JsonObject status = obj["status"].as<JsonObject>();
-            if (!status.containsKey("id") || !status.containsKey("name"))
+            const char  *id     = GET_STR(obj, "id");
+            const cJSON *status = cJSON_GetObjectItem(obj, "status");
+            if (!cJSON_HasObjectItem(status, "id") || !cJSON_HasObjectItem(status, "name"))
             {
                 LOGW("incomplete status info");
             }
             else
             {
-                JsonObject  opponent    = obj["opponent"].as<JsonObject>();
-                const char *opp_name    = opponent["username"].as<const char*>();
-                const char *color       = obj["color"].as<const char*>();
-                const char *fen         = obj["fen"].as<const char*>();
-                const char *lastmove    = obj["lastMove"].as<const char*>();
-                const char *status_name = status["name"].as<const char*>();
+                const char *opp_name    = GET_STR2(obj, "opponent", "username");
+                const char *color       = GET_STR(obj, "color");
+                const char *fen         = GET_STR(obj, "fen");
+                const char *lastmove    = GET_STR(obj, "lastMove");
+                const char *status_name = GET_STR(status, "name");
 
                 strncpy(ps_game->ac_id, id, sizeof(ps_game->ac_id) - 1);
                 strncpy(ps_game->ac_fen, fen, sizeof(ps_game->ac_fen) - 1);
@@ -96,26 +96,27 @@ int parse_game_event(DynamicJsonDocument &json, game_st *ps_game /*output*/)
                 LOGI("%s %s", status_name, ps_game->ac_id);
 
                 ps_game->b_color        = color[0] == 'w';
-                ps_game->b_turn         = obj["isMyTurn"];
-                ps_game->e_state        = (game_state_et)status["id"].as<int>();
+                ps_game->b_turn         = cJSON_IsTrue(cJSON_GetObjectItem(obj, "isMyTurn"));
+                ps_game->e_state        = (game_state_et) cJSON_GetNumberValue(cJSON_GetObjectItem(status, "id"));
 
                 return ps_game->e_state;
             }
 
         }
     }
+
     return GAME_STATE_UNKNOWN;
 }
 
-static inline void parse_game_state_event(JsonObject &obj, game_st *ps_game, String &moves)
+static inline void parse_game_state_event(const cJSON *obj, game_st *ps_game, String &moves)
 {
-    String status       = obj["status"].as<const char *>();
+    String status       = GET_STR(obj, "status");
 
-    moves               = obj["moves"].as<const char *>();
-    ps_game->u32_wtime  = obj["wtime"].as<uint32_t>();
-    ps_game->u32_btime  = obj["btime"].as<uint32_t>();
-    ps_game->u32_winc   = obj["winc"].as<uint32_t>();
-    ps_game->u32_binc   = obj["binc"].as<uint32_t>();
+    moves               = GET_STR(obj, "moves");
+    ps_game->u32_wtime  = GET_NUM(obj, "wtime");
+    ps_game->u32_btime  = GET_NUM(obj, "btime");
+    ps_game->u32_winc   = GET_NUM(obj, "winc");
+    ps_game->u32_binc   = GET_NUM(obj, "binc");
 
     strncpy(ps_game->ac_state, status.c_str(), sizeof(ps_game->ac_state) - 1);
 
@@ -124,34 +125,23 @@ static inline void parse_game_state_event(JsonObject &obj, game_st *ps_game, Str
     ps_game->e_state = get_state(status);
 }
 
-int parse_game_state(DynamicJsonDocument &json, game_st *ps_game /*output*/, String &moves)
+int parse_game_state(const cJSON *state, game_st *ps_game /*output*/, String &moves)
 {
-    if (json.containsKey("type"))
+    if (cJSON_HasObjectItem(state, "type"))
     {
-        String type = json["type"].as<const char*>();
+        String type = GET_STR(state, "type");
         //LOGD("event %s", type.c_str());
 
         game_stream_state_et e_type = get_stream_state(type);
         if (GAME_STREAM_STATE_FULL == e_type)
         {
-            JsonObject obj = json["state"].as<JsonObject>();
-            parse_game_state_event(obj, ps_game, moves);
+            state = cJSON_GetObjectItem(state, "state");
+            parse_game_state_event(state, ps_game, moves);
         }
         else if (GAME_STREAM_STATE_CURRENT == e_type)
         {
-            JsonObject obj = json.as<JsonObject>();
-            parse_game_state_event(obj, ps_game, moves);
+            parse_game_state_event(state, ps_game, moves);
         }
-#if 0 // this should be on "event" stream
-        else if (GAME_STREAM_STATE_FINISH == e_type)
-        {
-            JsonObject game   = json["game"].as<JsonObject>();
-            JsonObject obj    = game["status"].as<JsonObject>();
-            String     status = obj["name"].as<const char*>();
-            LOGI("finish: %s", status.c_str());
-            ps_game->e_state = get_state(status);
-        }
-#endif
         else
         {
             LOGW("not yet supported stream state %d", e_type);
@@ -171,7 +161,7 @@ bool game_move(const char *game_id, const char *move_uci)
     endpoint += "/move/";
     endpoint += move_uci;
 
-    return api_post(endpoint.c_str(), "", _rsp, true);
+    return api_post(endpoint.c_str());
 }
 
 // api/board/game/{gameId}/abort
@@ -182,7 +172,7 @@ bool game_abort(const char *game_id)
     endpoint += game_id;
     endpoint += "/abort";
 
-    return api_post(endpoint.c_str(), "", _rsp, true);
+    return api_post(endpoint.c_str());
 }
 
 // api/board/game/{gameId}/resign
@@ -193,7 +183,7 @@ bool game_resign(const char *game_id)
     endpoint += game_id;
     endpoint += "/resign";
 
-    return api_post(endpoint.c_str(), "", _rsp, true);
+    return api_post(endpoint.c_str());
 }
 
 // api/board/game/{gameId}/draw/{accept}
@@ -205,7 +195,7 @@ bool handle_draw(const char *game_id, bool b_accept)
     endpoint += "/draw/";
     endpoint += b_accept ? "yes" : "no";
 
-    return api_post(endpoint.c_str(), "", _rsp, true);
+    return api_post(endpoint.c_str());
 }
 
 // api/board/game/{gameId}/takeback/{accept}
@@ -217,7 +207,7 @@ bool handle_takeback(const char *game_id, bool b_accept)
     endpoint += "/takeback/";
     endpoint += b_accept ? "yes" : "no";
 
-    return api_post(endpoint.c_str(), "", _rsp, true);
+    return api_post(endpoint.c_str());
 }
 
 } // namespace lichess

@@ -37,7 +37,6 @@ static uint32_t         ms_last_stream; // timestamp of last receive data
 
 static char             ac_username[32];
 static Preferences      configs;
-DynamicJsonDocument     response(2*1024);
 
 
 static enum {
@@ -52,7 +51,9 @@ static enum {
 
 static bool get_account()
 {
-    bool b_status = false;
+    cJSON  *root     = NULL;
+    cJSON  *item     = NULL;
+    bool    b_status = false;
 
     SHOW_STATUS("lichess.org ...");
 
@@ -61,22 +62,27 @@ static bool get_account()
         SHOW_STATUS("%.*s", 20, ac_username);
         b_status = true;
     }
-    else if (!api_get("/api/account", response))
+    else if (!api_get("/api/account", &root, false))
     {
         SHOW_STATUS("lichess api error");
     }
-    else if (!response.containsKey("username"))
+    else if (NULL == (item = cJSON_GetObjectItem(root, "username")))
     {
         LOGW("unknown username");
         SHOW_STATUS("unknown username");
     }
     else
     {
-        const char *username = response["username"].as<const char*>();
+        const char *username = cJSON_GetStringValue(item);
         LOGI("username : %s", username);
         strncpy(ac_username, username, sizeof(ac_username) - 1);
         SHOW_STATUS("%.*s", 20, ac_username);
         b_status = true;
+    }
+
+    if (root)
+    {
+        cJSON_Delete(root);
     }
 
     return b_status;
@@ -84,12 +90,12 @@ static bool get_account()
 
 static int poll_events()
 {
-    char    payload_buff[1024];
-    int     payload_len = 0;
-    String  endpoint = stream_client.getEndpoint();
-    int     result = -1;
+    char        payload_buff[1024];
+    int         payload_len = 0;
+    const char *endpoint = stream_client.getEndpoint();
+    int         result = -1;
 
-    if (!endpoint.isEmpty() && !endpoint.startsWith("/api/stream/event"))
+    if (strlen(endpoint) && (0 != strncmp(endpoint, "/api/stream/event", strlen("/api/stream/event"))))
     {
         return  0; // ignore, not for us
     }
@@ -116,19 +122,19 @@ static int poll_events()
         if (payload_len > 8 /* {"x":"y"} */)
         {
             LOGD("payload (%d): %s", payload_len, payload_buff);
-            response.clear();
-            DeserializationError error = deserializeJson(response, payload_buff);
-            if (error)
+            cJSON *response = NULL;
+            cJSON *objtype  = NULL;
+            if (NULL == (response = cJSON_Parse(payload_buff)))
             {
-                LOGW("deserializeJson() failed: %s", error.f_str());
+                LOGW("parse json failed (%s)", cJSON_GetErrorPtr());
             }
-            else if (!response.containsKey("type"))
+            else if (NULL == (objtype = cJSON_GetObjectItem(response, "type")))
             {
                 LOGW("unknown event type");
             }
             else
             {
-                const char *type = response["type"].as<const char*>();
+                const char *type = cJSON_GetStringValue(objtype);
                 LOGD("event %s", type);
                 if (0 == strncmp(type, "game", strlen("game")))
                 {
@@ -176,6 +182,11 @@ static int poll_events()
                     }
                 }
             }
+
+            if (NULL != response)
+            {
+                cJSON_Delete(response);
+            }
         }
         delay(100);
     }
@@ -217,12 +228,12 @@ static inline void display_clock(bool b_turn, bool b_show)
 
 static int poll_game_state()
 {
-    char    payload_buff[1024];
-    int     payload_len = 0;
-    String  endpoint = stream_client.getEndpoint();
-    int     result = -1;
+    char        payload_buff[1024];
+    int         payload_len = 0;
+    const char *endpoint = stream_client.getEndpoint();
+    int         result = -1;
 
-    if (!endpoint.isEmpty() && !endpoint.startsWith("/api/board/game/stream"))
+    if (strlen(endpoint) && (0 != strncmp(endpoint, "/api/board/game/stream", strlen("/api/board/game/stream"))))
     {
         return  0; // ignore, not for us
     }
@@ -248,21 +259,21 @@ static int poll_game_state()
 
         if (payload_len > 8 /* {"x":"y"} */)
         {
-            LOGD("payload (%d): %s", payload_len, payload_buff);
-            response.clear();
-            DeserializationError error = deserializeJson(response, payload_buff);
-            if (error)
+            //LOGD("payload (%d): %s", payload_len, payload_buff);
+            cJSON *response = NULL;
+            cJSON *objtype  = NULL;
+            if (NULL == (response = cJSON_Parse(payload_buff)))
             {
-                LOGW("deserializeJson() failed: %s", error.f_str());
+                LOGW("parse json failed (%s)", cJSON_GetErrorPtr());
             }
-            else if (!response.containsKey("type"))
+            else if (NULL == (objtype = cJSON_GetObjectItem(response, "type")))
             {
                 LOGW("unknown game state");
                 display_clock(false, false);
             }
             else
             {
-                const char *type = response["type"].as<const char*>();
+                const char *type = cJSON_GetStringValue(objtype);
                 result = parse_game_state(response, &s_current_game, str_current_moves);
                 str_last_move = str_current_moves;
                 int sp = str_current_moves.length() ? str_current_moves.lastIndexOf(' ') : 0;
@@ -273,6 +284,11 @@ static int poll_game_state()
                 chess::queue_move(str_last_move);
                 //LOGD("%s", str_current_moves.c_str());
                 display_clock(s_current_game.b_turn, true);
+            }
+
+            if (NULL != response)
+            {
+                cJSON_Delete(response);
             }
         }
 
@@ -374,7 +390,7 @@ static void taskClient(void *)
         case CLIENT_STATE_CHECK_EVENTS:
             if (s_current_game.ac_id[0])
             {
-                if (!stream_client.getEndpoint().startsWith("/api/board/game/stream"))
+                if (0 != strncmp(stream_client.getEndpoint(), "/api/board/game/stream", strlen("/api/board/game/stream")))
                 {
                     stream_client.end(true);
                     delay(1000);
@@ -619,6 +635,11 @@ bool get_token(String &token)
     token = configs.getString("token");
     //LOGD("token = %s", token.c_str());
     return token.length() > 0;
+}
+
+bool get_token(char *token, size_t len)
+{
+    return configs.getString("token", token, len) > 0;
 }
 
 bool set_game_options(String &opponent, uint16_t u16_clock_limit, uint8_t u8_clock_increment, bool b_rated)
