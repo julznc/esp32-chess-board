@@ -481,6 +481,11 @@ void loop(uint32_t ms_last_changed)
           #endif
             ui::leds::setColor(au8_allowed_squares[0], (1 == u8_squares_count) ? ui::leds::LED_RED : ui::leds::LED_ORANGE);
             for (uint8_t i = 1; i < u8_squares_count; i++) {
+                if (pending_move.from == au8_allowed_squares[0]) {
+                    ui::leds::setColor(au8_allowed_squares[0], ui::leds::LED_GREEN);
+                    ui::leds::setColor(au8_allowed_squares[i], (pending_move.to == au8_allowed_squares[i]) ? ui::leds::LED_GREEN : ui::leds::LED_OFF);
+                    continue;
+                }
                 ui::leds::setColor(au8_allowed_squares[i], ui::leds::LED_GREEN);
                 //LOGD("%u/%u %c%u", i, u8_squares_count - 1, ALGEBRAIC(au8_allowed_squares[i]));
             }

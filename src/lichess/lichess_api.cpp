@@ -41,7 +41,7 @@ int ApiClient::SecClient::connect()
     }
     else if (0 != connect_ssl())
     {
-        stop(false);
+        // handshake failed
     }
     else
     {
@@ -76,21 +76,24 @@ uint8_t ApiClient::SecClient::connected()
 
 void ApiClient::SecClient::stop(bool b_deinit)
 {
-    //mbedtls_ssl_close_notify(&_ssl_ctx);
-    mbedtls_ssl_session_reset(&_ssl_ctx);
+    _b_connected = false;
 
     if (b_deinit) {
         memset(&_server_addr, 0, sizeof(_server_addr));
+        //LOGD("free(ssl)");
         deinit_ssl();
+    } else if (_b_init_done) {
+        //LOGD("session reset");
+        //mbedtls_ssl_close_notify(&_ssl_ctx);
+        mbedtls_ssl_session_reset(&_ssl_ctx);
     }
 
-    if (_sock_fd > 0){
+    if (_sock_fd > 0) {
+        //LOGD("close(%d)", _sock_fd);
         lwip_shutdown(_sock_fd, 2);
         lwip_close(_sock_fd);
         _sock_fd = -1;
     }
-
-    _b_connected = false;
 }
 
 size_t ApiClient::SecClient::write(const uint8_t *buf, size_t size)
@@ -166,7 +169,6 @@ void ApiClient::SecClient::flush()
     //mbedtls_ssl_flush_output(&_ssl_ctx);
 }
 
-
 int ApiClient::SecClient::init_ssl()
 {
     static const char *pers = "esp32-tls";
@@ -205,7 +207,12 @@ int ApiClient::SecClient::init_ssl()
     }
     else
     {
+
+      #if 1
         mbedtls_ssl_conf_authmode(&_ssl_conf, MBEDTLS_SSL_VERIFY_REQUIRED);
+      #else
+        mbedtls_ssl_conf_authmode(&_ssl_conf, MBEDTLS_SSL_VERIFY_NONE);
+      #endif
         mbedtls_ssl_conf_ca_chain(&_ssl_conf, &_ca_cert, NULL);
         mbedtls_ssl_conf_rng(&_ssl_conf, mbedtls_ctr_drbg_random, &_ctr_drbg);
 
@@ -228,12 +235,16 @@ int ApiClient::SecClient::init_ssl()
 
 void ApiClient::SecClient::deinit_ssl()
 {
-    mbedtls_entropy_free(&_entropy_ctx);
-    mbedtls_ctr_drbg_free(&_ctr_drbg);
-    mbedtls_x509_crt_free(&_ca_cert);
-    mbedtls_ssl_config_free(&_ssl_conf);
-    mbedtls_ssl_free(&_ssl_ctx);
-    _b_init_done = false;
+    if (_b_init_done)
+    {
+        mbedtls_entropy_free(&_entropy_ctx);
+        mbedtls_ctr_drbg_free(&_ctr_drbg);
+        mbedtls_x509_crt_free(&_ca_cert);
+        mbedtls_ssl_config_free(&_ssl_conf);
+        mbedtls_ssl_free(&_ssl_ctx);
+
+        _b_init_done = false;
+    }
 }
 
 int ApiClient::SecClient::connect_socket()
@@ -243,6 +254,14 @@ int ApiClient::SecClient::connect_socket()
 
     if (0 == _server_addr.sin_addr.s_addr)
     {
+        uint32_t wifi_timeout = millis() + LICHESS_API_TIMEOUT_MS;
+        while (!wifi::connected()) {
+            if (millis() > wifi_timeout) {
+                LOGD("wifi not connected");
+                return -1;
+            }
+            delay(500);
+        }
         if (!WiFi.hostByName(host, address))
         {
             LOGW("failed to resolve '%s'", host);
@@ -372,7 +391,14 @@ int ApiClient::SecClient::connect_ssl()
     else
     {
         LOGW("handshake failed (err = -0x%x)", -err);
-        //stop();
+        if ((MBEDTLS_ERR_SSL_WANT_READ != err) && (MBEDTLS_ERR_SSL_WANT_WRITE != err) && (MBEDTLS_ERR_SSL_CRYPTO_IN_PROGRESS != err))
+        {
+            stop(true);
+        }
+        else
+        {
+            stop(false);
+        }
     }
 
     return err;

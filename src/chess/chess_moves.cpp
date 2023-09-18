@@ -503,7 +503,7 @@ uint8_t hint_moves(game_st *p_game /*board*/, move_st *list /*moves list*/, cons
             count = 0;
         } else if (0 != scan[u8_toggle_idx]) {
             sq = IDX_TO_SQUARE(u8_toggle_idx);
-            LOGD("new piece %u on %c%u", scan[u8_toggle_idx], ALGEBRAIC(sq));
+            LOGD("new piece %c on %c%u", scan[u8_toggle_idx], ALGEBRAIC(sq));
             count = 0;
         } else {
             uint8_t rank = u8_toggle_idx >> 3;

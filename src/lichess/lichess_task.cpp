@@ -483,6 +483,8 @@ static void taskClient(void *)
                 {
                     if ((0 != ac_uci_move[0]) && (b_turn != s_current_game.b_color))
                     {
+                        pc_last_move = " -- ";
+                        display_clock(b_turn, true);
                         if (game_move(s_current_game.ac_id, ac_uci_move))
                         {
                             LOGD("send move %s ok", ac_uci_move);
