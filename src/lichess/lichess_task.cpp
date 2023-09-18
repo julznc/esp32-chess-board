@@ -35,6 +35,7 @@ static const char      *pc_last_move = "...";
 static uint32_t         ms_last_stream; // timestamp of last receive data
 
 static char             ac_username[32];
+static char             payload_buff[2048];
 static Preferences      configs;
 
 
@@ -89,9 +90,8 @@ static bool get_account()
 
 static int poll_events()
 {
-    char        payload_buff[1024];
-    int         payload_len = 0;
     const char *endpoint = stream_client.getEndpoint();
+    int         payload_len = 0;
     int         result = -1;
 
     if (strlen(endpoint) && (0 != strncmp(endpoint, "/api/stream/event", strlen("/api/stream/event"))))
@@ -227,9 +227,8 @@ static inline void display_clock(bool b_turn, bool b_show)
 
 static int poll_game_state()
 {
-    char        payload_buff[1024];
-    int         payload_len = 0;
     const char *endpoint = stream_client.getEndpoint();
+    int         payload_len = 0;
     int         result = -1;
 
     if (strlen(endpoint) && (0 != strncmp(endpoint, "/api/board/game/stream", strlen("/api/board/game/stream"))))
@@ -606,7 +605,7 @@ void init(void)
         xTaskCreate(
             taskClient,     /* Task function. */
             "taskClient",   /* String with name of task. */
-            32*1024,        /* Stack size in bytes. */
+            16*1024,        /* Stack size in bytes. */
             NULL,           /* Parameter passed as input of the task */
             4,              /* Priority of the task. */
             NULL);          /* Task handle. */

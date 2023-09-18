@@ -89,8 +89,6 @@ void ApiClient::SecClient::stop(bool b_deinit)
     }
 
     if (_sock_fd > 0) {
-        //LOGD("close(%d)", _sock_fd);
-        lwip_shutdown(_sock_fd, 2);
         lwip_close(_sock_fd);
         _sock_fd = -1;
     }
@@ -249,30 +247,7 @@ void ApiClient::SecClient::deinit_ssl()
 
 int ApiClient::SecClient::connect_socket()
 {
-    IPAddress   address;
-    const char *host = LICHESS_API_HOST;
-
-    if (0 == _server_addr.sin_addr.s_addr)
-    {
-        uint32_t wifi_timeout = millis() + LICHESS_API_TIMEOUT_MS;
-        while (!wifi::connected()) {
-            if (millis() > wifi_timeout) {
-                LOGD("wifi not connected");
-                return -1;
-            }
-            delay(500);
-        }
-        if (!WiFi.hostByName(host, address))
-        {
-            LOGW("failed to resolve '%s'", host);
-            return -1;
-        }
-        _server_addr.sin_addr.s_addr = address;
-        _server_addr.sin_port        = htons(LICHESS_API_PORT);
-        _server_addr.sin_family      = AF_INET;
-        LOGI("'%s' = %s", host, address.toString().c_str());
-    }
-
+    int res = 0;
 
     if (_sock_fd > 0)
     {
@@ -280,11 +255,78 @@ int ApiClient::SecClient::connect_socket()
         return _sock_fd;
     }
 
-    _sock_fd = lwip_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (0 == _server_addr.sa_len)
+    {
+        struct  addrinfo hints;
+        struct  addrinfo *addr_list;
 
-    if (_sock_fd <= 0) {
+        uint32_t wifi_timeout = millis() + LICHESS_API_TIMEOUT_MS;
+        while (!wifi::connected()) {
+            if (millis() > wifi_timeout) {
+                LOGD("wifi not connected");
+                return MBEDTLS_ERR_NET_CONNECT_FAILED;
+            }
+            delay(500);
+        }
+
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC; // ipv4 or ipv6
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+
+        if (0 != lwip_getaddrinfo(LICHESS_API_HOST, LICHESS_API_PORT, &hints, &addr_list))
+        {
+            LOGW("getaddrinfo() failed");
+            return MBEDTLS_ERR_NET_UNKNOWN_HOST;
+        }
+
+        for (struct addrinfo *cur = addr_list; cur != NULL; cur = cur->ai_next)
+        {
+            _sock_fd = lwip_socket(cur->ai_family, cur->ai_socktype, cur->ai_protocol);
+            if (_sock_fd <= 0) {
+                LOGW("failed opening socket (%d)", _sock_fd);
+                res = MBEDTLS_ERR_NET_SOCKET_FAILED;
+                continue;
+            }
+
+            if (0 != (res = lwip_connect(_sock_fd, cur->ai_addr, cur->ai_addrlen)))
+            {
+                LOGW("connect on fd %d, errno: %d, \"%s\"", _sock_fd, errno, strerror(errno));
+                lwip_close(_sock_fd);
+                _sock_fd = -1;
+                res = MBEDTLS_ERR_NET_CONNECT_FAILED;
+            }
+            else // success
+            {
+                memcpy(&_server_addr, cur->ai_addr, sizeof(_server_addr));
+                _server_addr.sa_len     = cur->ai_addrlen;
+                _server_addr.sa_family  = cur->ai_family;
+
+                char    str_addr[INET6_ADDRSTRLEN];
+                struct  sockaddr_in *in_addr = (struct sockaddr_in *)&_server_addr;
+                lwip_inet_ntop(_server_addr.sa_family, &in_addr->sin_addr, str_addr, sizeof(str_addr));
+                LOGI("\"%s\" = %s", LICHESS_API_HOST, str_addr);
+                break;
+            }
+        }
+
+        freeaddrinfo(addr_list);
+    }
+    else if ((_sock_fd = lwip_socket(_server_addr.sa_family, SOCK_STREAM, IPPROTO_TCP)) <= 0)
+    {
         LOGW("failed opening socket (%d)", _sock_fd);
-        return _sock_fd;
+    }
+    else if (0 != (res = lwip_connect(_sock_fd, &_server_addr, _server_addr.sa_len)))
+    {
+        LOGW("connect on fd %d, errno: %d, \"%s\"", _sock_fd, errno, strerror(errno));
+        lwip_close(_sock_fd);
+        _sock_fd = -1;
+    }
+
+    if (_sock_fd < 0)
+    {
+        LOGW("failed");
+        return -1;
     }
 
     int flags = lwip_fcntl(_sock_fd, F_GETFL, 0 );
@@ -301,12 +343,7 @@ int ApiClient::SecClient::connect_socket()
     int         sockerr = 0;
     socklen_t   len = (socklen_t)sizeof(int);
 
-    int res = lwip_connect(_sock_fd, (struct sockaddr*)&_server_addr, sizeof(_server_addr));
-    if (res < 0 && (errno != EINPROGRESS))
-    {
-        LOGW("connect on fd %d, errno: %d, \"%s\"", _sock_fd, errno, strerror(errno));
-    }
-    else if ((res = select(_sock_fd + 1, nullptr, &fdset, nullptr, &tv)) < 0)
+    if ((res = select(_sock_fd + 1, nullptr, &fdset, nullptr, &tv)) < 0)
     {
         LOGW("select on fd %d, errno: %d, \"%s\"", _sock_fd, errno, strerror(errno));
     }
@@ -344,10 +381,9 @@ int ApiClient::SecClient::connect_socket()
         return _sock_fd;
     }
 
-    lwip_shutdown(_sock_fd, 2);
     lwip_close(_sock_fd);
     _sock_fd = -1;
-    return -1;
+    return _sock_fd;
 }
 
 int ApiClient::SecClient::connect_ssl()

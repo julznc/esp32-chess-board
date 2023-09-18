@@ -1,9 +1,10 @@
 #ifndef __LICHESS_API_H__
 #define __LICHESS_API_H__
 
-#include <lwip/sockets.h>
+#include <lwip/netdb.h> // sockets & getaddrinfo
+
 #include <mbedtls/platform.h>
-#include <mbedtls/net.h>
+#include <mbedtls/net_sockets.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -72,7 +73,7 @@ class ApiClient
         int send_ssl(const uint8_t *data, size_t len);
 
     protected:
-        struct sockaddr_in          _server_addr;
+        struct sockaddr             _server_addr;
         int                         _sock_fd;
         bool                        _b_init_done;
         bool                        _b_connected;
