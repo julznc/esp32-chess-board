@@ -364,16 +364,15 @@ static void scan()
                 s_found_aps.as_ap[s_found_aps.u8_total].u8_idx   = i; // store
                 s_found_aps.as_ap[s_found_aps.u8_total].password = s_configs.ac_passwd;
                 // increment
-                s_found_aps.u8_total++;
-                break;
-            }
-
-            if (s_found_aps.u8_total >= MAX_FOUND_APS) {
-                break;
+                if (++s_found_aps.u8_total >= MAX_FOUND_APS) {
+                    break;
+                }
             }
 
             PRINTF("\r\n");
         }
+
+        PRINTF("\r\n");
 
         if (s_found_aps.u8_total)
         {

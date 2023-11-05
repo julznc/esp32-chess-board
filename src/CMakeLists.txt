@@ -5,10 +5,12 @@ idf_component_register(
         "globals.cpp"
         "app/board/board.cpp"
         "app/lichess/lichess_client.cpp"
+        "app/ui/display.cpp"
         "app/ui/ui.cpp"
         "app/web/web_server.cpp"
         "app/wifi/wifi_setup.cpp"
         "hal/hal_gpio.c"
+        "hal/hal_i2c.c"
     INCLUDE_DIRS
         "."
         "app"

@@ -16,10 +16,11 @@
 #include <freertos/event_groups.h>
 
 #include "hal_gpio.h"
+#include "hal_i2c.h"
 
 
 #define K_APP_NAME          "Electronic Chess Board"
-#define K_APP_VERSION       "00.02.0002"    // <major>.<minor>.<test>
+#define K_APP_VERSION       "00.02.0003"    // <major>.<minor>.<test>
 
 // at 1ms tick
 #define delayms(ms)         vTaskDelay(ms)
