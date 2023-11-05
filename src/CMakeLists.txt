@@ -15,6 +15,7 @@ idf_component_register(
         driver
         esp_partition
         esp_psram
+        esp_wifi
         nvs_flash
         spi_flash
 )

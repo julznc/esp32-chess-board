@@ -19,7 +19,7 @@
 DECLARE_TASK(Board,     brd::init,      brd::loop,      0);
 DECLARE_TASK(Client,    lichess::init,  lichess::loop,  0);
 DECLARE_TASK(Ui,        ui::init,       ui::loop,       0);
-DECLARE_TASK(Wifi,      wifi::init,     wifi::loop,     0);
+DECLARE_TASK(Wifi,      wifi::init,     wifi::loop,    10);
 
 
 extern "C" void app_main(void)
