@@ -1,5 +1,5 @@
-#ifndef __GLOBALS_H__
-#define __GLOBALS_H__
+
+#pragma once
 
 #include <string.h>
 #include <time.h>
@@ -15,9 +15,11 @@
 #include <freertos/semphr.h>
 #include <freertos/event_groups.h>
 
+#include "hal_gpio.h"
+
 
 #define K_APP_NAME          "Electronic Chess Board"
-#define K_APP_VERSION       "00.02.0001"    // <major>.<minor>.<test>
+#define K_APP_VERSION       "00.02.0002"    // <major>.<minor>.<test>
 
 // at 1ms tick
 #define delayms(ms)         vTaskDelay(ms)
@@ -49,6 +51,3 @@
 
 
 void global_init(void);
-
-
-#endif // __GLOBALS_H__

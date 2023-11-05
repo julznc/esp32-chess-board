@@ -8,9 +8,11 @@ idf_component_register(
         "app/ui/ui.cpp"
         "app/web/web_server.cpp"
         "app/wifi/wifi_setup.cpp"
+        "hal/hal_gpio.c"
     INCLUDE_DIRS
         "."
         "app"
+        "hal"
     EMBED_FILES
         "app/web/index.html"
         "app/web/favicon.svg"

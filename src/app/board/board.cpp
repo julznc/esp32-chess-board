@@ -14,7 +14,10 @@ bool init()
 
 void loop()
 {
-    delayms(10);
+    LED_ON();
+    delayms(500);
+    LED_OFF();
+    delayms(500);
 }
 
 } // namespace brd
