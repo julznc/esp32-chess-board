@@ -33,6 +33,14 @@ void global_init(void)
     const esp_partition_t *partition = esp_ota_get_running_partition();
     LOGI("--- run: %s ---", partition->label);
 
+    esp_ota_img_states_t ota_state;
+    if (ESP_OK == esp_ota_get_state_partition(partition, &ota_state)) {
+        // Mark current app as valid
+        if (ESP_OTA_IMG_PENDING_VERIFY == ota_state) {
+            esp_ota_mark_app_valid_cancel_rollback();
+        }
+    }
+
     const char *rst_reason = "UNKNOWN";
     switch (esp_reset_reason())
     {

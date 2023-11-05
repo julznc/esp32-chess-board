@@ -75,7 +75,11 @@ form input { margin: 2px auto;}
         </fieldset>
       </form><br><br>
       <form method='POST' action='/update' enctype='multipart/form-data'>
-        <fieldset><legend>FW Update</legend><input type='file' name='update' accept=".bin" required><input type='submit' value='Update'></fieldset>
+        <fieldset><legend>FW Update</legend>
+          <input type="file" id="otafile" name="otafile" accept=".bin">
+          <button id="upload" type="button" onclick="startUpload()">Update</button>
+          <div id="progress"></div>
+        </fieldset>
       </form><br>
       <form method="post" action="/reset">
         <fieldset><legend>Reset</legend>
@@ -113,6 +117,33 @@ form input { margin: 2px auto;}
     rsp.json().then(function (creds) { document.querySelector('input[name="ssid"]').value = creds.ssid; });
   }).catch(function(err){ console.log(err); });
 })();
+
+function startUpload() {
+  var otafile = document.getElementById("otafile").files;
+  if (otafile.length == 0) {
+    alert("No file selected!");
+  } else {
+    document.getElementById("otafile").disabled = true;
+    document.getElementById("upload").disabled = true;
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState == 4) {
+        if (xhr.status == 200) {
+          document.open(); document.write(xhr.responseText); document.close();
+        } else if (xhr.status == 0) {
+          alert("Server closed the connection!"); location.reload();
+        } else {
+          alert(xhr.status + " Error!\r\n" + xhr.responseText); location.reload();
+        }
+      }
+    };
+    xhr.upload.onprogress = function (e) {
+      document.getElementById("progress").textContent = "Uploaded: " + (e.loaded * 100 / e.total).toFixed(0) + "%";
+    };
+    xhr.open("POST", "/update", true);
+    xhr.send(otafile[0]);
+  }
+}
   </script>
 </body>
 </html>

@@ -302,7 +302,7 @@ bool get_credentials(const char **ssid, const char **passwd)
             *passwd = s_configs.ac_passwd;
         }
 
-        LOGD("cfg: \"%s\" - \"%s\"", s_configs.ac_ssid, s_configs.ac_passwd);
+        //LOGD("cfg: \"%s\" - \"%s\"", s_configs.ac_ssid, s_configs.ac_passwd);
         b_status = s_configs.ac_ssid[0] && s_configs.ac_passwd[0];
     }
 
@@ -336,6 +336,7 @@ static void scan()
     (void)esp_wifi_clear_ap_list();
     if (false == get_credentials(NULL, NULL))
     {
+        LOGW("no wi-fi credentials yet");
         e_state = WIFI_STATE_AP;
     }
     else if (ESP_OK != esp_wifi_scan_start(NULL, true))

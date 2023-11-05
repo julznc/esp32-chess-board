@@ -12,6 +12,10 @@
 namespace web::server
 {
 
+static char recv_buf[1024];
+static char send_buf[256];
+
+
 #ifdef WEB_SERVER_BASIC_AUTH
 static char *http_auth_basic(const char *username, const char *password)
 {
@@ -147,35 +151,95 @@ esp_err_t get_pgn_handler(httpd_req_t *req)
 /* send lichess game settings */
 esp_err_t get_gamecfg_handler(httpd_req_t *req)
 {
-    char        rsp[128];
     char        opponent[64] = "to do";
     uint16_t    u16_limit = 15 * 60;
     uint8_t     u8_increment = 10;
     bool        b_rated = false;
 
-    snprintf(rsp, sizeof(rsp), "{\"opponent\": \"%s\", \"mode\": \"%s\", \"limit\":%u, \"increment\": %u}",
-                opponent, b_rated ? "rated" : "casual", u16_limit / 60, u8_increment);
+    snprintf(send_buf, sizeof(send_buf) - 1,
+            "{\"opponent\": \"%s\", \"mode\": \"%s\", \"limit\":%u, \"increment\": %u}",
+            opponent, b_rated ? "rated" : "casual", u16_limit / 60, u8_increment);
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, rsp);
+    httpd_resp_sendstr(req, send_buf);
     return ESP_OK;
 }
 
 /* send wifi credentials */
 esp_err_t get_wificfg_handler(httpd_req_t *req)
 {
-    char rsp[128];
     const char *ssid = "";
     const char *passwd = "";
 
     (void)wifi::get_credentials(&ssid, &passwd);
-    snprintf(rsp, sizeof(rsp), "{\"ssid\": \"%s\", \"passwd\":\"%s\"}", ssid, passwd);
+    snprintf(send_buf, sizeof(send_buf) - 1, "{\"ssid\": \"%s\", \"passwd\":\"%s\"}", ssid, passwd);
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, rsp);
+    httpd_resp_sendstr(req, send_buf);
     return ESP_OK;
 }
 
+/* handle OTA file upload */
+esp_err_t post_update_handler(httpd_req_t *req)
+{
+    esp_ota_handle_t    ota_handle = 0;
+    int                 remaining = req->content_len;
+    LOGD("update file size %d bytes", remaining);
+
+    const esp_partition_t *ota_partition = esp_ota_get_next_update_partition(NULL);
+    ESP_ERROR_CHECK(esp_ota_begin(ota_partition, OTA_SIZE_UNKNOWN, &ota_handle));
+
+    while (remaining > 0)
+    {
+        size_t to_read = remaining;
+        if (to_read > sizeof(recv_buf)) {
+            to_read = sizeof(recv_buf);
+        }
+        int recv_len = httpd_req_recv(req, recv_buf, to_read);
+
+        // Timeout Error: Just retry
+        if (recv_len == HTTPD_SOCK_ERR_TIMEOUT){
+            continue;
+        }
+
+        // Serious Error: Abort OTA
+        else if (recv_len <= 0) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Protocol Error");
+            return ESP_FAIL;
+        }
+
+        // Successful Upload: Flash firmware chunk
+        if ((ESP_OK != esp_ota_write(ota_handle, (const void *)recv_buf, recv_len)))
+        {
+            LOGE("ota flash error");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Flash Error");
+            return ESP_FAIL;
+        }
+
+        remaining -= recv_len;
+
+        PRINTF("\rrx %7d\r", req->content_len - remaining);
+    }
+
+    PRINTF("\r\n");
+
+    // Validate and switch to new OTA image and reboot
+    if ((ESP_OK != esp_ota_end(ota_handle)) ||
+        (ESP_OK != esp_ota_set_boot_partition(ota_partition)))
+    {
+        LOGE("ota activation error");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Validation / Activation Error");
+        return ESP_FAIL;
+    }
+
+    LOGI("ota update complete");
+    httpd_resp_sendstr(req, "Firmware update complete, rebooting now!");
+
+    delayms(1000);
+    esp_restart();
+
+    return ESP_OK;
+}
 
 bool start()
 {
@@ -237,6 +301,13 @@ bool start()
         .user_ctx = NULL
     };
 
+    httpd_uri_t post_update = {
+        .uri      = "/update",
+        .method   = HTTP_POST,
+        .handler  = post_update_handler,
+        .user_ctx = NULL
+    };
+
     if (ESP_OK == httpd_start(&server, &config))
     {
         httpd_register_uri_handler(server, &get_index);
@@ -246,6 +317,7 @@ bool start()
         httpd_register_uri_handler(server, &get_pgn);
         httpd_register_uri_handler(server, &get_gamecfg);
         httpd_register_uri_handler(server, &get_wificfg);
+        httpd_register_uri_handler(server, &post_update);
         b_started = true;
     }
 
