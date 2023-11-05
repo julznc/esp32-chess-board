@@ -6,15 +6,21 @@ idf_component_register(
         "app/board/board.cpp"
         "app/lichess/lichess_client.cpp"
         "app/ui/ui.cpp"
+        "app/web/web_server.cpp"
         "app/wifi/wifi_setup.cpp"
     INCLUDE_DIRS
         "."
         "app"
+    EMBED_FILES
+        "app/web/index.html"
+        "app/web/favicon.svg"
     REQUIRES
         app_update
         driver
+        esp_http_server
         esp_partition
         esp_psram
+        esp-tls
         esp_wifi
         nvs_flash
         spi_flash

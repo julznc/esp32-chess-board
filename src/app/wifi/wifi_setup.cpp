@@ -3,6 +3,7 @@
 
 #include "globals.h"
 
+#include "web/web_server.h"
 #include "wifi_setup_cfg.h"
 #include "wifi_setup.h"
 
@@ -201,12 +202,10 @@ bool init()
     {
         LOGW("nvs_open failed");
     }
-#if 0 // to do
     else if (false == web::server::start())
     {
         LOGW("web_server failed");
     }
-#endif
     else
     {
         LOGD("%s() ok", __func__);
