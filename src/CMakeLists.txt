@@ -3,8 +3,13 @@ idf_component_register(
     SRCS
         "main.cpp"
         "globals.cpp"
+        "app/board/board.cpp"
+        "app/lichess/lichess_client.cpp"
+        "app/ui/ui.cpp"
+        "app/wifi/wifi_setup.cpp"
     INCLUDE_DIRS
         "."
+        "app"
     REQUIRES
         app_update
         driver
