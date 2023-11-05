@@ -4,6 +4,7 @@
 
 #include "globals.h"
 
+#include "wifi/wifi_setup.h"
 #include "web_server_cfg.h"
 #include "web_server.h"
 
@@ -127,6 +128,55 @@ esp_err_t get_version_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* send lichess username */
+esp_err_t get_username_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req, "to do");
+    return ESP_OK;
+}
+
+/* send current PGN */
+esp_err_t get_pgn_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req, "to do");
+    return ESP_OK;
+}
+
+/* send lichess game settings */
+esp_err_t get_gamecfg_handler(httpd_req_t *req)
+{
+    char        rsp[128];
+    char        opponent[64] = "to do";
+    uint16_t    u16_limit = 15 * 60;
+    uint8_t     u8_increment = 10;
+    bool        b_rated = false;
+
+    snprintf(rsp, sizeof(rsp), "{\"opponent\": \"%s\", \"mode\": \"%s\", \"limit\":%u, \"increment\": %u}",
+                opponent, b_rated ? "rated" : "casual", u16_limit / 60, u8_increment);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, rsp);
+    return ESP_OK;
+}
+
+/* send wifi credentials */
+esp_err_t get_wificfg_handler(httpd_req_t *req)
+{
+    char rsp[128];
+    const char *ssid = "";
+    const char *passwd = "";
+
+    (void)wifi::get_credentials(&ssid, &passwd);
+    snprintf(rsp, sizeof(rsp), "{\"ssid\": \"%s\", \"passwd\":\"%s\"}", ssid, passwd);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, rsp);
+    return ESP_OK;
+}
+
+
 bool start()
 {
     static bool b_started = false;
@@ -159,11 +209,43 @@ bool start()
         .user_ctx = NULL
     };
 
+    httpd_uri_t get_username = {
+        .uri      = "/username",
+        .method   = HTTP_GET,
+        .handler  = get_username_handler,
+        .user_ctx = NULL
+    };
+
+    httpd_uri_t get_pgn = {
+        .uri      = "/pgn",
+        .method   = HTTP_GET,
+        .handler  = get_pgn_handler,
+        .user_ctx = NULL
+    };
+
+    httpd_uri_t get_gamecfg = {
+        .uri      = "/lichess-game",
+        .method   = HTTP_GET,
+        .handler  = get_gamecfg_handler,
+        .user_ctx = NULL
+    };
+
+    httpd_uri_t get_wificfg = {
+        .uri      = "/wifi-cfg",
+        .method   = HTTP_GET,
+        .handler  = get_wificfg_handler,
+        .user_ctx = NULL
+    };
+
     if (ESP_OK == httpd_start(&server, &config))
     {
         httpd_register_uri_handler(server, &get_index);
         httpd_register_uri_handler(server, &get_favicon);
         httpd_register_uri_handler(server, &get_version);
+        httpd_register_uri_handler(server, &get_username);
+        httpd_register_uri_handler(server, &get_pgn);
+        httpd_register_uri_handler(server, &get_gamecfg);
+        httpd_register_uri_handler(server, &get_wificfg);
         b_started = true;
     }
 
