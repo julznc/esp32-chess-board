@@ -11,10 +11,14 @@ idf_component_register(
         "app/wifi/wifi_setup.cpp"
         "hal/hal_gpio.c"
         "hal/hal_i2c.c"
+        "lib/graphics/graphics.cpp"
+        "lib/oledmono/oledmono.cpp"
+        "lib/oledmono/sh110x.cpp"
     INCLUDE_DIRS
         "."
         "app"
         "hal"
+        "lib"
     EMBED_FILES
         "app/web/index.html"
         "app/web/favicon.svg"

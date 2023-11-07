@@ -7,6 +7,7 @@
 namespace ui::display
 {
 
+SH1106G oled(SCREEN_WIDTH, SCREEN_HEIGHT);
 static SemaphoreHandle_t mtx             = NULL;
 
 
@@ -20,6 +21,8 @@ bool init()
 
         hal_i2c_init();
     }
+
+    oled.init();
 
     return true;
 }
