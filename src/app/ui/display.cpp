@@ -1,6 +1,6 @@
 
+#include <atomic>
 #include "globals.h"
-
 #include "display.h"
 
 
@@ -48,7 +48,7 @@ static bool oled_i2c_write(const uint8_t *buffer, size_t buffer_len, bool stop,
     }
     else
     {
-        LOGD("i2c write(%u) success", buffer_len);
+        //LOGD("i2c write(%u) success", buffer_len);
     }
 
     i2c_cmd_link_delete_static(cmd);
@@ -57,6 +57,9 @@ static bool oled_i2c_write(const uint8_t *buffer, size_t buffer_len, bool stop,
 
 SH1106G oled(SCREEN_WIDTH, SCREEN_HEIGHT, oled_i2c_write);
 static SemaphoreHandle_t mtx             = NULL;
+static std::atomic<bool> b_display_found;
+static std::atomic<bool> b_batt_ok;
+static uint8_t           u8_error_count  = 0;
 
 
 bool init()
@@ -70,9 +73,34 @@ bool init()
         hal_i2c_init();
     }
 
-    oled.init();
+    b_display_found = false;
+    b_batt_ok       = false;
 
-    return true;
+    if (!oled.init())
+    {
+        LOGW("OLED not found");
+        b_display_found = false;
+      #if 1 // skip checking of battery level if testing with mcu-board only
+        if (++u8_error_count >= 3) {
+            b_batt_ok       = true;
+            u8_error_count  = 0;
+        }
+      #endif
+        delayms(5000UL);
+    }
+    else
+    {
+        // to do: oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
+        // to do: oled.cp437(true);
+
+        oled.splash();
+        oled.display();
+        LOGD("OLED ok");
+        b_display_found = true;
+        u8_error_count  = 0;
+    }
+
+    return b_display_found;
 }
 
 } // namespace ui::display

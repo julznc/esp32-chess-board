@@ -6,6 +6,10 @@
 
 // copied from "Adafruit_GrayOLED" library
 
+#define MONOOLED_BLACK          0   ///< Default black 'color' for monochrome OLEDS
+#define MONOOLED_WHITE          1   ///< Default white 'color' for monochrome OLEDS
+#define MONOOLED_INVERSE        2   ///< Default inversion command for monochrome OLEDS
+
 class OledMono : public Graphics
 {
 public:
@@ -15,6 +19,9 @@ public:
 
     OledMono(uint16_t w, uint16_t h, write_func_t fp_write);
 
+    void drawPixel(int16_t x, int16_t y, uint16_t color);
+
+    virtual void display(void) = 0;
     void clearDisplay(void);
 
     void oled_command(uint8_t c);
@@ -23,4 +30,7 @@ public:
 
 protected:
     write_func_t fp_write;
+    uint8_t *framebuff;    ///< Internal 1:1 framebuffer of display mem
+    size_t framebuff_sz;
+    int16_t window_x1, window_y1, window_x2, window_y2; ///< Dirty tracking window
 };

@@ -8,6 +8,10 @@ class Graphics
 public:
     Graphics(int16_t w, int16_t h);
 
+    virtual void drawPixel(int16_t x, int16_t y, uint16_t color) = 0;
+
+    void drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h, uint16_t color);
+
 protected:
     int16_t WIDTH;        ///< This is the 'raw' display width - never changes
     int16_t HEIGHT;       ///< This is the 'raw' display height - never changes

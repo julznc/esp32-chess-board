@@ -46,6 +46,11 @@ class SH110X : public OledMono
 {
 public:
     SH110X(uint16_t w, uint16_t h, write_func_t fp_write);
+
+    void display(void);
+
+protected:
+    uint8_t _page_start_offset;
 };
 
 
@@ -55,4 +60,5 @@ public:
     SH1106G(uint16_t w, uint16_t h, write_func_t fp_write);
 
     bool init(void);
+    void splash(void);
 };
