@@ -90,8 +90,8 @@ bool init()
     }
     else
     {
-        // to do: oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
-        // to do: oled.cp437(true);
+        oled.setTextColor(SH110X_WHITE, SH110X_BLACK);
+        oled.cp437(true);
 
         oled.splash();
         oled.display();
@@ -101,6 +101,16 @@ bool init()
     }
 
     return b_display_found;
+}
+
+bool lock()
+{
+    return b_display_found && (pdTRUE == xSemaphoreTake(ui::display::mtx, portMAX_DELAY));
+}
+
+void unlock()
+{
+    xSemaphoreGive(ui::display::mtx);
 }
 
 } // namespace ui::display

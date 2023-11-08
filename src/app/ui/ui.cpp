@@ -31,6 +31,11 @@ void loop()
         }
         else
         {
+            delayms(1 * 1000);
+            DISPLAY_TEXT1(0, 0, "e-Board v%s", K_APP_VERSION);
+            delayms(1 * 1000);
+            DISPLAY_CLEAR();
+            DISPLAY_TEXT1(0, 0, "e-Board v%.5s", K_APP_VERSION);
             e_state = UI_STATE_IDLE;
         }
         break;
