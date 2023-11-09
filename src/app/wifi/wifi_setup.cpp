@@ -2,6 +2,7 @@
 #include <esp_wifi.h>
 
 #include "globals.h"
+#include "ui/display.h"
 
 #include "web/web_server.h"
 #include "wifi_setup_cfg.h"
@@ -10,6 +11,9 @@
 
 namespace wifi
 {
+
+#define SHOW_STATUS(msg, ...)       DISPLAY_CLEAR_ROW(10, 8); \
+                                    DISPLAY_TEXT1(0, 10, msg, ## __VA_ARGS__)
 
 static struct {
     nvs_handle_t    nvs;
@@ -127,9 +131,10 @@ static void ip_event_handler(void* arg, esp_event_base_t event_base,
         LOGI("IP addr: " IPSTR, IP2STR(&got_ip->ip_info.ip));
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         snprintf(ac_host_info, sizeof(ac_host_info) - 1,
-                "%.16s - .%d.%d", ap_info.ssid,
+                "%.10s.%d.%d", ap_info.ssid,
                 esp_ip4_addr3_16(&got_ip->ip_info.ip), // hide "192.168" octets
                 esp_ip4_addr4_16(&got_ip->ip_info.ip));
+        SHOW_STATUS("%s", ac_host_info);
         break;
     case IP_EVENT_STA_LOST_IP: // see NETIF_IP_LOST_TIMER_INTERVAL
         LOGW("lost ip");
@@ -333,10 +338,14 @@ static void scan()
     s_found_aps.u8_connect = 0;
     s_found_aps.u8_total   = 0;
 
+    SHOW_STATUS("scanning Wi-Fi...");
+
     (void)esp_wifi_clear_ap_list();
     if (false == get_credentials(NULL, NULL))
     {
         LOGW("no wi-fi credentials yet");
+        SHOW_STATUS("No Wi-Fi config");
+        delayms(3000);
         e_state = WIFI_STATE_AP;
     }
     else if (ESP_OK != esp_wifi_scan_start(NULL, true))
@@ -450,6 +459,7 @@ static void connect()
         else
         {
             LOGD("connecting to AP #%d " BSSIDSTR " (%s:%s) ...", u8_idx + 1, BSSID2STR(ps_sta->bssid), ps_sta->ssid, ps_sta->password);
+            SHOW_STATUS("%s ...", ps_sta->ssid);
             EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
                                 WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
                                 pdFALSE, pdFALSE, CONNECT_TIMEOUT_MS);
@@ -513,6 +523,7 @@ static void soft_ap()
         if (ESP_OK == esp_netif_get_ip_info(ap_netif, &ip_info))
         {
             LOGI("IP aadr: " IPSTR, IP2STR(&ip_info.ip));
+            SHOW_STATUS("%s-" IPSTR, AP_SSID_PREFIX, IP2STR(&ip_info.ip));
         }
         else
         {
@@ -550,6 +561,7 @@ static void check()
         {
             if (!warned) {
                 LOGW("WiFi disconnected, retrying");
+                SHOW_STATUS("disconnected");
                 warned = true;
             }
             (void)esp_wifi_stop();
