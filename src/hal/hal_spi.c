@@ -26,7 +26,8 @@ void hal_fspi_init(void)
         //.input_delay_ns  = 8,
         .mode            = RFID_SPI_MODE,
         .spics_io_num    = PIN_RFID_CS,
-        .queue_size      = 1
+        .queue_size      = 1,
+        .flags           = SPI_DEVICE_POSITIVE_CS, // inverted CS pin logic
     };
 
 #if 0 // https://docs.espressif.com/projects/esp-idf/en/v5.1.1/esp32/api-reference/peripherals/spi_slave.html#restrictions-and-known-issues

@@ -19,9 +19,9 @@ void hal_gpio_init(void)
     // configure rfids i/o
     io_conf.pin_bit_mask  = (1 << PIN_RFID_RST);
     io_conf.pin_bit_mask |= (1 << PIN_RFID_RST_A) | (1 << PIN_RFID_RST_B) | (1 << PIN_RFID_RST_C);
-    io_conf.pin_bit_mask |= (1 << PIN_RFID_SS_A)  | (1 << PIN_RFID_SS_B)  | (1 << PIN_RFID_SS_C);
+    io_conf.pin_bit_mask |= (1 << PIN_RFID_CS_A)  | (1 << PIN_RFID_CS_B)  | (1 << PIN_RFID_CS_C);
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     ESP_ERROR_CHECK( gpio_config(&io_conf) );

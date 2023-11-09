@@ -31,6 +31,6 @@
 #define PIN_RFID_RST_C      (GPIO_NUM_6)
 
 // multiplexed via HC138
-#define PIN_RFID_SS_A       (GPIO_NUM_4)
-#define PIN_RFID_SS_B       (GPIO_NUM_3)
-#define PIN_RFID_SS_C       (GPIO_NUM_2)
+#define PIN_RFID_CS_A       (GPIO_NUM_4)
+#define PIN_RFID_CS_B       (GPIO_NUM_3)
+#define PIN_RFID_CS_C       (GPIO_NUM_2)

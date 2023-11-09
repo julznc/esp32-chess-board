@@ -1,5 +1,7 @@
 
 #include "globals.h"
+#include "mfrc522/mfrc522.h"
+
 #include "ui/ui.h"
 #include "board.h"
 
@@ -13,6 +15,8 @@ static enum {
     BRD_STATE_IDLE
 } e_state;
 
+static MFRC522      rc522(fspi_transfer, PIN_RFID_RST);
+
 //static uint8_t      au8_pieces[64];
 //static uint32_t     au32_toggle_ms[64];
 
@@ -24,9 +28,9 @@ static uint8_t      u8_selected_rank;
 static inline void select_file(uint8_t file)
 {
     u8_selected_file = file;
-    PIN_WRITE(RFID_SS_A, file & 1 ? 1 : 0);
-    PIN_WRITE(RFID_SS_B, file & 2 ? 1 : 0);
-    PIN_WRITE(RFID_SS_C, file & 4 ? 1 : 0);
+    PIN_WRITE(RFID_CS_A, file & 1 ? 1 : 0);
+    PIN_WRITE(RFID_CS_B, file & 2 ? 1 : 0);
+    PIN_WRITE(RFID_CS_C, file & 4 ? 1 : 0);
 }
 
 // set row
@@ -114,14 +118,14 @@ static bool checkSquares(void)
     for (uint8_t rank = RANK_START; b_complete && (rank <= RANK_END); rank++)
     {
         select_rank(rank);
-        // to do: rc522.PCF_HardReset();
+        rc522.PCF_HardReset();
 
         ui::leds::clear();
 
         for (uint8_t file = FILE_START; b_complete && (file <= FILE_END); file++)
         {
             select_file(file);
-#if 0 // to do
+
             rc522.PCD_Init();
             delayms(1);
 
@@ -136,7 +140,7 @@ static bool checkSquares(void)
                 b_complete = false;
                 break;
             }
-
+#if 0 // to do
             uint8_t rxgain = rc522.PCD_GetAntennaGain();
             if (expected_rxgain != rxgain) // defective reader chip?
             {
