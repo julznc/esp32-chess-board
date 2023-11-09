@@ -29,7 +29,7 @@ void loop()
     switch (e_state)
     {
     case UI_STATE_INIT:
-        if (!display::init())
+        if (!display::init() || !leds::init())
         {
             delayms(5 * 1000);
         }

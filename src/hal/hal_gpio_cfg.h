@@ -3,6 +3,8 @@
 
 // built-in led
 #define PIN_LED             (GPIO_NUM_15)
+// board leds
+#define PIN_LED_STRIP       (GPIO_NUM_21)
 
 // oled i2c
 #define PIN_OLED_SDA        (GPIO_NUM_9)
