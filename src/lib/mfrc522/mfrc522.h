@@ -161,6 +161,14 @@ public:
     void PCF_HardReset();
     void PCD_Init();
     void PCD_AntennaOn();
+    uint8_t PCD_GetAntennaGain();
+
+    StatusCode PCD_TransceiveData(uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen, uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false);
+    StatusCode PCD_CommunicateWithPICC(uint8_t command, uint8_t waitIRq, uint8_t *sendData, uint8_t sendLen, uint8_t *backData = nullptr, uint8_t *backLen = nullptr, uint8_t *validBits = nullptr, uint8_t rxAlign = 0, bool checkCRC = false);
+    StatusCode PICC_RequestA(uint8_t *bufferATQA, uint8_t *bufferSize);
+    StatusCode PICC_REQA_or_WUPA(uint8_t command, uint8_t *bufferATQA, uint8_t *bufferSize);
+
+    StatusCode MIFARE_Read(uint8_t blockAddr, uint8_t *buffer, uint8_t *bufferSize);
 
 private:
     xfer_func_t _xfer;  // func ptr

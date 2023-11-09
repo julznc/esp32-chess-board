@@ -2,6 +2,7 @@
 #include "globals.h"
 #include "mfrc522/mfrc522.h"
 
+#include "chess/chess.h"
 #include "ui/ui.h"
 #include "board.h"
 
@@ -17,8 +18,8 @@ static enum {
 
 static MFRC522      rc522(fspi_transfer, PIN_RFID_RST);
 
-//static uint8_t      au8_pieces[64];
-//static uint32_t     au32_toggle_ms[64];
+static uint8_t      au8_pieces[64];
+static uint32_t     au32_toggle_ms[64];
 
 static uint8_t      u8_selected_file;
 static uint8_t      u8_selected_rank;
@@ -112,7 +113,7 @@ static bool checkSquares(void)
     static const uint8_t FILE_START = 0;
     static const uint8_t FILE_END   = 3;
 #endif
-    //static const uint8_t expected_rxgain = 0x40; // default RxGain is 0x40 (33dB)
+    static const uint8_t expected_rxgain = 0x40; // default RxGain is 0x40 (33dB)
     bool b_complete = true;
 
     for (uint8_t rank = RANK_START; b_complete && (rank <= RANK_END); rank++)
@@ -140,14 +141,14 @@ static bool checkSquares(void)
                 b_complete = false;
                 break;
             }
-#if 0 // to do
+
             uint8_t rxgain = rc522.PCD_GetAntennaGain();
             if (expected_rxgain != rxgain) // defective reader chip?
             {
                 LOGW("rxgain = 0x%02x on %c%u", rxgain, 'a' + u8_selected_file, u8_selected_rank + 1);
                 rc522.PCD_WriteRegister(MFRC522::RFCfgReg, expected_rxgain);
             }
-#endif
+
             //LOGD("found %c%u v%02X", 'a' + file, rank + 1, u8_version);
             ui::leds::setColor(rank, file, ui::leds::LED_GREEN);
         }
@@ -197,16 +198,143 @@ static void animate_squares(void)
     }
 }
 
-static uint32_t scan(void)
+static inline void square_init(void)
 {
     // to do
+}
 
-    LED_ON();
-    delayms(250);
-    LED_OFF();
-    delayms(250);
+static inline void square_deinit(void)
+{
+#if 0
+    rc522.PICC_HaltA();
+#else // power-down & receiver-off
+    rc522.PCD_WriteRegister(MFRC522::CommandReg, 0x30);
+#endif
+}
+
+
+static inline bool has_piece(void)
+{
+    MFRC522::StatusCode result;
+    uint8_t             bufferATQA[2];
+    uint8_t             bufferSize = sizeof(bufferATQA);
+
+    // Reset baud rates
+    rc522.PCD_WriteRegister(MFRC522::TxModeReg, 0x00);
+    rc522.PCD_WriteRegister(MFRC522::RxModeReg, 0x00);
+    // Reset ModWidthReg
+    rc522.PCD_WriteRegister(MFRC522::ModWidthReg, 0x26);
+
+    result = rc522.PICC_RequestA(bufferATQA, &bufferSize);
+    return ((MFRC522::STATUS_OK == result) || (MFRC522::STATUS_COLLISION == result));
+}
+
+static inline uint8_t read_piece(uint16_t u8_expected_piece, uint8_t u8_retry, bool b_init)
+{
+    MFRC522::StatusCode status;
+    uint8_t             buffer[16 + 2]; // minimum
+    uint8_t             size = sizeof(buffer);
+
+    if (b_init)
+    {
+        //rc522.PCD_Reset(); // soft reset
+        square_init();
+    }
+
+    if (!has_piece())
+    {
+        if (0 != u8_expected_piece)
+        {
+            if (u8_retry > 0)
+            {
+                u8_retry--;
+                return read_piece(u8_expected_piece, u8_retry, u8_retry & 1);
+            }
+            else
+            {
+                //LOGD("removed %c on %c%u?", u8_expected_piece, 'a' + u8_selected_file, u8_selected_rank + 1);
+            }
+        }
+    }
+    else if (MFRC522::STATUS_OK != (status = rc522.MIFARE_Read(NTAG_DATA_START_PAGE, buffer, &size)))
+    {
+        if (u8_retry > 0)
+        //if ((u8_retry > 0) && ((MFRC522::STATUS_TIMEOUT==status) || (MFRC522::STATUS_CRC_WRONG==status)))
+        {
+            return read_piece(u8_expected_piece, --u8_retry, false);
+        }
+        else
+        {
+            LOGW("read failed on %c%u (status=%d)", 'a' + u8_selected_file, u8_selected_rank + 1, status);
+        }
+    }
+    else
+    {
+        uint8_t u8_piece = buffer[NTAG_DATA_PIECE_OFFSET];
+        uint8_t u7_type  = PIECE_TYPE(u8_piece);
+        //uint8_t b_color  = PIECE_COLOR(u8_piece);
+        if (VALID_PIECE(u7_type))
+        {
+            //LOGD("[%c on %c%u] %s %s", u8_piece, 'a' + u8_selected_file, u8_selected_rank + 1,
+            //    chess::color_to_string(b_color), chess::piece_to_string(u7_type));
+            return u8_piece;
+        }
+        else
+        {
+            //LOGW("invalid piece %02x on %c%u", u8_piece, 'a' + u8_selected_file, u8_selected_rank + 1);
+        }
+    }
 
     return 0;
+}
+
+static uint32_t scan(void)
+{
+    static const uint8_t MAX_READ_RETRIES = 16;
+    static uint32_t ms_last_toggle = 0;
+
+    for (uint8_t rank = 0; rank < 8; rank++)
+    {
+        select_rank(rank);
+        rc522.PCF_HardReset();
+
+        for (uint8_t file = 0; file < 8; file++)
+        {
+            select_file(file);
+
+            uint8_t idx   = (rank<<3) + file;
+            uint8_t piece = read_piece(au8_pieces[idx], MAX_READ_RETRIES, true);
+
+            if (au8_pieces[idx] != piece)
+            {
+                uint8_t piece_check = read_piece(au8_pieces[idx], MAX_READ_RETRIES, true);
+
+                if (piece != piece_check) // re-read
+                {
+                    //LOGD("re-check %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
+                    piece_check = read_piece(piece, MAX_READ_RETRIES, true);
+                }
+                if ((piece != piece_check) && (au8_pieces[idx] != piece_check)) // verify x2
+                {
+                    LOGW("verify failed %02x vs %02x on %c%u", piece, piece_check, 'a' + file, rank + 1);
+                }
+                piece = piece_check; // ignore further errors
+                if (au8_pieces[idx] != piece)
+                {
+                    au32_toggle_ms[idx] = millis();
+                    //LOGD("toggle %c on %c%u", piece ? piece : '-', 'a' + file, rank + 1);
+                    ms_last_toggle = au32_toggle_ms[idx];
+                }
+            }
+
+            au8_pieces[idx] = piece;
+
+            square_deinit();
+        }
+
+    }
+    //LOGD("scan done");
+    return ms_last_toggle;
 }
 
 } // namespace brd
