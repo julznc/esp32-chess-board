@@ -15,9 +15,7 @@ idf_component_register(
         "hal/hal_gpio.c"
         "hal/hal_i2c.c"
         "lib/graphics/graphics.cpp"
-        "lib/led_strip/led_strip_api.c"
-        "lib/led_strip/led_strip_rmt_dev.c"
-        "lib/led_strip/led_strip_rmt_encoder.c"
+        "lib/led_strip/led_strip_encoder.c"
         "lib/oledmono/oledmono.cpp"
         "lib/oledmono/sh110x.cpp"
     INCLUDE_DIRS

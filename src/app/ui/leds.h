@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include <led_strip/led_strip.h>
+#include <led_strip/led_strip_encoder.h>
 
 namespace ui::leds
 {

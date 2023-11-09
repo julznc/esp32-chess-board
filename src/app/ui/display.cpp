@@ -105,12 +105,12 @@ bool init()
 
 bool lock()
 {
-    return b_display_found && (pdTRUE == xSemaphoreTake(ui::display::mtx, portMAX_DELAY));
+    return b_display_found && (pdTRUE == xSemaphoreTake(mtx, portMAX_DELAY));
 }
 
 void unlock()
 {
-    xSemaphoreGive(ui::display::mtx);
+    xSemaphoreGive(mtx);
 }
 
 void showBattLevel(void)

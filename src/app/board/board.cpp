@@ -44,7 +44,18 @@ void loop()
         break;
 
     case BRD_STATE_SCAN:
-        scan();
+        if (MAIN_BTN.pressedDuration() >= 3000UL)
+        {
+            LOGD("restart");
+            MAIN_BTN.resetCount();
+            e_state = BRD_STATE_INIT;
+        }
+        else
+        {
+            // to do
+            scan();
+        }
+
         break;
 
     default:
@@ -65,7 +76,7 @@ static void _lit_square(uint8_t u8_rank, uint8_t u8_file)
     ui::leds::clear();
     ui::leds::setColor(u8_rank, u8_file, ui::leds::LED_ORANGE);
     ui::leds::update();
-    delayms(50);
+    delayms(5);
 }
 
 static void animate_squares(void)
@@ -102,9 +113,9 @@ static uint32_t scan(void)
     // to do
 
     LED_ON();
-    delayms(500);
+    delayms(250);
     LED_OFF();
-    delayms(500);
+    delayms(250);
 
     return 0;
 }

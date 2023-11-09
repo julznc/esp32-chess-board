@@ -1,40 +1,55 @@
 
 #include "globals.h"
 
+#include <driver/rmt_tx.h>
+
 #include "leds.h"
 
 
 namespace ui::leds
 {
 
-static led_strip_handle_t led_strip = NULL;
 static bool init_done = false;
+
+
+#define RMT_LED_STRIP_RESOLUTION_HZ     (1 * 1000 * 10000) // 10MHz resolution
+
+static rmt_channel_handle_t led_channel = NULL;
+static rmt_encoder_handle_t led_encoder = NULL;
+static rmt_transmit_config_t led_tx_cfg;
+static uint8_t              led_strip_pixels[LED_STRIP_NUMPIXELS * 3 /*rgb bytes*/];
+static SemaphoreHandle_t    mtx = NULL;
+
 
 bool init(void)
 {
     if (!init_done)
     {
-        /* LED strip initialization with the GPIO and pixels number*/
-        led_strip_config_t strip_config;// = {0, };
-        strip_config.strip_gpio_num = PIN_LED_STRIP;
-        strip_config.max_leds = LED_STRIP_NUMPIXELS;
-        strip_config.led_pixel_format = LED_PIXEL_FORMAT_GRB;
-        strip_config.led_model = LED_MODEL_WS2812;
-        strip_config.flags.invert_out = 0;
+        mtx = xSemaphoreCreateMutex();
+        assert(NULL != mtx);
 
-        led_strip_rmt_config_t rmt_config;// = {0, };
-        rmt_config.clk_src = RMT_CLK_SRC_DEFAULT,
-        rmt_config.resolution_hz = 10 * 1000 * 1000; // 10MHz
-        rmt_config.mem_block_symbols = 0; // at least 64, or 0 to set default
-        rmt_config.flags.with_dma = 0; // no DMA (not supported?)
+        rmt_tx_channel_config_t tx_ch_cfg;
+        tx_ch_cfg.gpio_num = PIN_LED_STRIP;
+        tx_ch_cfg.clk_src = RMT_CLK_SRC_DEFAULT;
+        tx_ch_cfg.resolution_hz = RMT_LED_STRIP_RESOLUTION_HZ; // 10MHz
+        tx_ch_cfg.mem_block_symbols = 128; // min 64 for non-DMA (max 256?)
+        tx_ch_cfg.trans_queue_depth = 4;
+        tx_ch_cfg.flags.invert_out = 0;
+        tx_ch_cfg.flags.with_dma = 0; // no RMT-DMA support for esp32s2
+        tx_ch_cfg.flags.io_loop_back = 0;
+        tx_ch_cfg.flags.io_od_mode = 0;
 
-        ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
-        //LOGD("led_strip = %p", led_strip);
+        led_strip_encoder_config_t encoder_cfg;
+        encoder_cfg.resolution = RMT_LED_STRIP_RESOLUTION_HZ;
 
-        /* Set all LED off to clear all pixels */
-        led_strip_clear(led_strip);
+        ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_ch_cfg, &led_channel));
+        ESP_ERROR_CHECK(rmt_new_led_strip_encoder(&encoder_cfg, &led_encoder));
+        ESP_ERROR_CHECK(rmt_enable(led_channel));
 
-        init_done = (NULL != led_strip);
+        clear();
+        led_tx_cfg.loop_count = 0, // no transfer loop
+        led_tx_cfg.flags.eot_level = 0;
+        init_done = true;
     }
 
     return init_done;
@@ -42,18 +57,36 @@ bool init(void)
 
 void update(void)
 {
-    /* Refresh the strip to send data */
-    if (init_done)
-        led_strip_refresh(led_strip);
-}
+    if (init_done && (pdTRUE == xSemaphoreTake(mtx, portMAX_DELAY)))
+    {
+        // Flush RGB values to LEDs
+        ESP_ERROR_CHECK(rmt_transmit(led_channel, led_encoder, led_strip_pixels, sizeof(led_strip_pixels), &led_tx_cfg));
+        ESP_ERROR_CHECK(rmt_tx_wait_all_done(led_channel, portMAX_DELAY));
 
+        xSemaphoreGive(mtx);
+    }
+}
 
 void clear(void)
 {
-    /* Set all LED off to clear all pixels */
-    if (init_done)
-        led_strip_clear(led_strip);
+    if (init_done && (pdTRUE == xSemaphoreTake(mtx, portMAX_DELAY)))
+    {
+        memset(led_strip_pixels, 0, sizeof(led_strip_pixels));
+        xSemaphoreGive(mtx);
+    }
 }
+
+static void led_strip_set_pixel(uint16_t index, uint8_t red, uint8_t green, uint8_t blue)
+{
+    uint8_t *pixel = led_strip_pixels;
+
+    pixel += index * 3;
+    // GRB format
+    *pixel++ = green;
+    *pixel++ = red;
+    *pixel++ = blue;
+}
+
 
 void setColor(uint8_t u8_rank, uint8_t u8_file, uint8_t u8_red, uint8_t u8_green, uint8_t u8_blue)
 {
@@ -62,10 +95,11 @@ void setColor(uint8_t u8_rank, uint8_t u8_file, uint8_t u8_red, uint8_t u8_green
 
     u8_file &= 0x03; // %4
 
-    if (init_done)
+    if (init_done && (pdTRUE == xSemaphoreTake(mtx, portMAX_DELAY)))
     {
-        led_strip_set_pixel(led_strip, u16_offset + u8_file, u8_red, u8_green, u8_blue);
-        led_strip_set_pixel(led_strip, u16_offset + 7 - u8_file, u8_red, u8_green, u8_blue);
+        led_strip_set_pixel(u16_offset + u8_file,     u8_red, u8_green, u8_blue);
+        led_strip_set_pixel(u16_offset + 7 - u8_file, u8_red, u8_green, u8_blue);
+        xSemaphoreGive(mtx);
     }
 }
 
