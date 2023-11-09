@@ -4,6 +4,8 @@ idf_component_register(
         "main.cpp"
         "globals.cpp"
         "app/board/board.cpp"
+        "app/chess/chess.cpp"
+        "app/chess/chess_moves.cpp"
         "app/lichess/lichess_client.cpp"
         "app/ui/buttons.cpp"
         "app/ui/display.cpp"

@@ -22,7 +22,7 @@
 
 
 #define K_APP_NAME          "Electronic Chess Board"
-#define K_APP_VERSION       "00.06.03"    // <major>.<minor>.<test>
+#define K_APP_VERSION       "00.07.01"    // <major>.<minor>.<test>
 
 // at 1ms tick
 #define delayms(ms)         vTaskDelay(ms)

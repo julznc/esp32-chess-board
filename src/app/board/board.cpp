@@ -67,6 +67,7 @@ void loop()
     switch (e_state)
     {
     case BRD_STATE_INIT:
+        chess::init();
         if (checkSquares() && checkSquares()) // check 2x
         {
             animate_squares();
@@ -88,8 +89,9 @@ void loop()
         }
         else
         {
-            // to do
-            scan();
+            //uint32_t ms_start = millis();
+            chess::loop(scan());
+            //LOGD("scan duration %lu ms", millis() - ms_start);
         }
 
         break;
@@ -99,6 +101,17 @@ void loop()
         break;
     }
 }
+
+const uint8_t *pu8_pieces(void)
+{
+    return au8_pieces;
+}
+
+const uint32_t *pu32_toggle_ms(void)
+{
+    return au32_toggle_ms;
+}
+
 
 static bool checkSquares(void)
 {
@@ -200,7 +213,36 @@ static void animate_squares(void)
 
 static inline void square_init(void)
 {
-    // to do
+#if 0
+    rc522.PCD_Init();
+#else
+    // wait for 150ms to be ready
+    uint32_t    ms_timeout  = millis() + 150;
+    uint8_t     u8_cmdreg   = 0;
+
+    // do soft-reset
+    rc522.PCD_WriteRegister(MFRC522::CommandReg, MFRC522::PCD_SoftReset);
+    do {
+        delayms(1);
+        u8_cmdreg = rc522.PCD_ReadRegister(MFRC522::CommandReg);
+        if (0 == (u8_cmdreg & 0x10)) { // check if powerdown bit is cleared
+            break; // reader is now ready
+        }
+    } while (millis() < ms_timeout);
+
+    if (0 != (u8_cmdreg & 10)) {
+        LOGW("square %c%u not ready (cmdreg 0x%02x)", 'a' + u8_selected_file, u8_selected_rank + 1, u8_cmdreg);
+    }
+
+    rc522.PCD_WriteRegister(MFRC522::TModeReg, 0x80);
+    rc522.PCD_WriteRegister(MFRC522::TPrescalerReg, 0xA9);
+    rc522.PCD_WriteRegister(MFRC522::TReloadRegH, 0x03);
+    rc522.PCD_WriteRegister(MFRC522::TReloadRegL, 0xE8);
+
+    rc522.PCD_WriteRegister(MFRC522::TxASKReg, 0x40);
+    rc522.PCD_WriteRegister(MFRC522::ModeReg, 0x3D);
+    rc522.PCD_AntennaOn();
+#endif
 }
 
 static inline void square_deinit(void)
