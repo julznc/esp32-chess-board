@@ -24,6 +24,8 @@ void loop()
 {
     static uint32_t ms_batt_update = 0;
 
+    btn::loop();
+
     switch (e_state)
     {
     case UI_STATE_INIT:

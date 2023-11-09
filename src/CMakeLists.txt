@@ -5,6 +5,7 @@ idf_component_register(
         "globals.cpp"
         "app/board/board.cpp"
         "app/lichess/lichess_client.cpp"
+        "app/ui/buttons.cpp"
         "app/ui/display.cpp"
         "app/ui/ui.cpp"
         "app/web/web_server.cpp"

@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "buttons.h"
 #include "display.h"
 
 
