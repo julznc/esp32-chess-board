@@ -18,10 +18,11 @@
 #include "hal_adc.h"
 #include "hal_gpio.h"
 #include "hal_i2c.h"
+#include "hal_spi.h"
 
 
 #define K_APP_NAME          "Electronic Chess Board"
-#define K_APP_VERSION       "00.05.03"    // <major>.<minor>.<test>
+#define K_APP_VERSION       "00.06.01"    // <major>.<minor>.<test>
 
 // at 1ms tick
 #define delayms(ms)         vTaskDelay(ms)

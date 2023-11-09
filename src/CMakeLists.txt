@@ -14,6 +14,7 @@ idf_component_register(
         "hal/hal_adc.c"
         "hal/hal_gpio.c"
         "hal/hal_i2c.c"
+        "hal/hal_spi.c"
         "lib/graphics/graphics.cpp"
         "lib/led_strip/led_strip_encoder.c"
         "lib/oledmono/oledmono.cpp"
