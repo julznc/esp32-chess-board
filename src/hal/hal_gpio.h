@@ -2,7 +2,6 @@
 #pragma once
 
 #include <driver/gpio.h>
-
 #include "hal_gpio_cfg.h"
 
 #ifdef __cplusplus

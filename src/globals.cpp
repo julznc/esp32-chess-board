@@ -60,5 +60,6 @@ void global_init(void)
 
     LOGW("%s reset", rst_reason);
 
+    hal_adc_init();
     hal_gpio_init();
 }

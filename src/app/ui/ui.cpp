@@ -22,6 +22,8 @@ bool init()
 
 void loop()
 {
+    static uint32_t ms_batt_update = 0;
+
     switch (e_state)
     {
     case UI_STATE_INIT:
@@ -41,6 +43,11 @@ void loop()
         break;
 
     case UI_STATE_IDLE:
+        if (millis() - ms_batt_update > 1500UL)
+        {
+            ms_batt_update = millis();
+            display::showBattLevel();
+        }
         break;
 
     default:

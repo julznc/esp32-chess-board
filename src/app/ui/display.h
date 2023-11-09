@@ -46,4 +46,12 @@ bool init();
 bool lock();
 void unlock();
 
+// via voltage divider resistors
+#define BATT_ADC_R1             (3270)      // 3k3 (from BATT+)
+#define BATT_ADC_R2             (4780)      // 4k7 (to GND)
+#define BATT_LEVEL_MIN          (3400)      // int millivolts
+
+void showBattLevel(void);
+bool battLevelOk(void);
+
 } // namespace ui::display

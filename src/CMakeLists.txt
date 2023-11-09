@@ -9,6 +9,7 @@ idf_component_register(
         "app/ui/ui.cpp"
         "app/web/web_server.cpp"
         "app/wifi/wifi_setup.cpp"
+        "hal/hal_adc.c"
         "hal/hal_gpio.c"
         "hal/hal_i2c.c"
         "lib/graphics/graphics.cpp"
@@ -25,6 +26,7 @@ idf_component_register(
     REQUIRES
         app_update
         driver
+        esp_adc
         esp_http_server
         esp_partition
         esp_psram
