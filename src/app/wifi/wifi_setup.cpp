@@ -279,7 +279,7 @@ bool set_credentials(const char *ssid, const char *passwd)
     }
     else if (ESP_OK != (err = nvs_commit(s_configs.nvs)))
     {
-        LOGW("nvs_set_str() = %d", err);
+        LOGW("nvs_commit() = %d", err);
     }
     else
     {

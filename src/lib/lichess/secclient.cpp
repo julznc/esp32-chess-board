@@ -186,22 +186,23 @@ int SecClient::init_ssl()
     if (0 != (err = mbedtls_ctr_drbg_seed(&_ctr_drbg, mbedtls_entropy_func,
                                         &_entropy_ctx, (const unsigned char *)pers, strlen(pers))))
     {
-        LOGW("mbedtls_ctr_drbg_seed() failed (err = %d)", err);
+        LOGW("mbedtls_ctr_drbg_seed() failed (err = -0x%x)", -err);
     }
-    else if (0 != (err = mbedtls_x509_crt_parse(&_ca_cert, LICHESS_ORG_PEM_START, LICHESS_ORG_PEM_END - LICHESS_ORG_PEM_START)))
+    else if (0 != (err = mbedtls_x509_crt_parse(&_ca_cert, LICHESS_ORG_PEM, strlen((const char *)LICHESS_ORG_PEM) + 1)))
     {
-        LOGW("mbedtls_x509_crt_parse() failed (err = %d)", err);
+        //LOGD("pem %s", (const char *)LICHESS_ORG_PEM);
+        LOGW("mbedtls_x509_crt_parse() failed (err = -0x%x)", -err);
     }
     else if (0 != (err = mbedtls_ssl_set_hostname(&_ssl_ctx, API_HOST)))
     {
-        LOGW("mbedtls_ssl_set_hostname() failed (err = %d)", err);
+        LOGW("mbedtls_ssl_set_hostname() failed (err = -0x%x)", -err);
     }
     else if (0 != (err = mbedtls_ssl_config_defaults(&_ssl_conf,
                                                     MBEDTLS_SSL_IS_CLIENT,
                                                     MBEDTLS_SSL_TRANSPORT_STREAM,
                                                     MBEDTLS_SSL_PRESET_DEFAULT)))
     {
-        LOGW("mbedtls_ssl_config_defaults() failed (err = %d)", err);
+        LOGW("mbedtls_ssl_config_defaults() failed (err = -0x%x)", -err);
     }
     else
     {
@@ -216,7 +217,7 @@ int SecClient::init_ssl()
 
         if (0 != (err = mbedtls_ssl_setup(&_ssl_ctx, &_ssl_conf)))
         {
-            LOGW("mbedtls_ssl_setup() failed (err = %d)", err);
+            LOGW("mbedtls_ssl_setup() failed (err = -0x%x)", -err);
         }
         else
         {

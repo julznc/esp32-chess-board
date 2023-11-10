@@ -42,6 +42,7 @@ idf_component_register(
         esp_psram
         esp-tls
         esp_wifi
+        json
         nvs_flash
         spi_flash
 )
