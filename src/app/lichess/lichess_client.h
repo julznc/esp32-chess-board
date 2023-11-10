@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "lichess/apiclient.h"
+
 
 namespace lichess
 {

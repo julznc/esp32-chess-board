@@ -255,6 +255,11 @@ void loop()
     }
 }
 
+bool connected()
+{
+    return s_found_aps.b_connected;
+}
+
 bool set_credentials(const char *ssid, const char *passwd)
 {
     esp_err_t   err;

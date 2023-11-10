@@ -16,8 +16,8 @@
                 }}
 
 
-DECLARE_TASK(Board,     brd::init,      brd::loop,      0);
-DECLARE_TASK(Client,    lichess::init,  lichess::loop,  0);
+DECLARE_TASK(Board,     brd::init,      brd::loop,      2);
+DECLARE_TASK(Client,    lichess::init,  lichess::loop, 10);
 DECLARE_TASK(Ui,        ui::init,       ui::loop,       5);
 DECLARE_TASK(Wifi,      wifi::init,     wifi::loop,    10);
 
@@ -30,8 +30,8 @@ extern "C" void app_main(void)
                 ESP_ERROR_CHECK(esp_task_wdt_add_user(#task, &task##_wdt_hdl)); \
                 assert(pdTRUE == xTaskCreatePinnedToCore(task##Task, #task, (stack), NULL, (priority), NULL, 0))
 
-    RUN_TASK(Ui,        8*1024, 3);
-    RUN_TASK(Board,     8*1024, 5);
-    RUN_TASK(Wifi,     16*1024, 4);
-    RUN_TASK(Client,   16*1024, 7);
+    RUN_TASK(Ui,        4*1024, 3);
+    RUN_TASK(Board,     4*1024, 5);
+    RUN_TASK(Wifi,      8*1024, 4);
+    RUN_TASK(Client,    8*1024, 7);
 }

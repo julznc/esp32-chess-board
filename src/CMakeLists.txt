@@ -19,6 +19,8 @@ idf_component_register(
         "hal/hal_spi.c"
         "lib/graphics/graphics.cpp"
         "lib/led_strip/led_strip_encoder.c"
+        "lib/lichess/apiclient.cpp"
+        "lib/lichess/secclient.cpp"
         "lib/mfrc522/mfrc522.cpp"
         "lib/oledmono/oledmono.cpp"
         "lib/oledmono/sh110x.cpp"
@@ -30,6 +32,7 @@ idf_component_register(
     EMBED_FILES
         "app/web/index.html"
         "app/web/favicon.svg"
+        "lib/lichess/lichess-org.pem"
     REQUIRES
         app_update
         driver
