@@ -16,6 +16,7 @@ static move_st          pending_move;
 static const uint8_t   *pu8_pieces = NULL;
 static uint8_t          au8_prev_pieces[64];
 static char             ac_fen_buf[FEN_BUFF_LEN];
+static char             ac_pgn_buf[PGN_BUFF_LEN];
 static bool             b_pending_led = false;
 static bool             b_skip_start_fen = false;
 static bool             b_valid_posision = false;
@@ -674,8 +675,30 @@ bool get_last_move(char *move)
 
 bool get_pgn(const char **pgn)
 {
-    // to do
-    return false;
+    if (NULL != pgn)
+    {
+        uint16_t total_moves = s_game.stats.move_number;
+        char    *ptr         = ac_pgn_buf;
+        size_t   len         = 0;
+
+        lock();
+        memset(ac_pgn_buf, 0, sizeof(ac_pgn_buf));
+        if (WHITE == s_game.stats.turn) {
+            total_moves--;
+        }
+        for (uint16_t move_num = 1; (move_num <= total_moves) && (len < sizeof(ac_pgn_buf) - 1); move_num++)
+        {
+            len += snprintf(ptr, sizeof(ac_pgn_buf) - len,
+                            "%u. %s %s ", move_num,
+                            s_move_stack[move_num -1].san_white,
+                            s_move_stack[move_num -1].san_black);
+            ptr += len;
+        }
+        *pgn = total_moves ? ac_pgn_buf : NULL;
+        unlock();
+    }
+
+    return true;
 }
 
 bool continue_game(const char *expected_fen)

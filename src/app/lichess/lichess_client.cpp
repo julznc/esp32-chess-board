@@ -78,6 +78,11 @@ bool init()
     memset(&ac_username, 0, sizeof(ac_username));
     memset(&s_configs, 0, sizeof(s_configs));
 
+    s_challenge.e_player            = CHALLENGE_DEFAULT_OPPONENT;
+    s_challenge.b_rated             = false;
+    s_challenge.u16_clock_limit     = CHALLENGE_DEFAULT_LIMIT;
+    s_challenge.u8_clock_increment  = CHALLENGE_DEFAULT_INCREMENT;
+
     if (ESP_OK != nvs_open("lichess", NVS_READWRITE, &s_configs.nvs))
     {
         LOGW("open configs failed");
@@ -91,7 +96,12 @@ bool init()
         if (get_token(NULL)) {
             ApiClient::lib_init(s_configs.ac_token);
         }
+        get_game_options(NULL, NULL, NULL, NULL);
 
+        s_challenge.e_player            = CHALLENGE_DEFAULT_OPPONENT;
+        s_challenge.b_rated             = s_configs.b_rated;
+        s_challenge.u16_clock_limit     = s_configs.u16_clock_limit;
+        s_challenge.u8_clock_increment  = s_configs.u8_clock_increment;
     }
 
     u8_error_count = 0;

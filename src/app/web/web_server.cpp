@@ -3,6 +3,7 @@
 #include <esp_tls_crypto.h>
 
 #include "globals.h"
+#include "chess/chess.h"
 #include "lichess/lichess_client.h"
 
 #include "wifi/wifi_setup.h"
@@ -174,8 +175,10 @@ esp_err_t get_username_handler(httpd_req_t *req)
 /* send current PGN */
 esp_err_t get_pgn_handler(httpd_req_t *req)
 {
+    const char *pgn = NULL;
+    chess::get_pgn(&pgn);
     httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "to do");
+    httpd_resp_sendstr(req, pgn ? pgn : "...");
     return ESP_OK;
 }
 

@@ -33,6 +33,7 @@ typedef enum {
 
 #define START_FEN                       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 #define FEN_BUFF_LEN                    (80)
+#define PGN_BUFF_LEN                    (2048)
 #define IS_START_FEN(fen)               (0 == strncmp(fen, START_FEN, 43))
 
 typedef enum {
