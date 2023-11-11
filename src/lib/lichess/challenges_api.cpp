@@ -109,4 +109,81 @@ int parse_challenge_event(const cJSON *event, challenge_st *ps_challenge)
     return CHALLENGE_NONE;
 }
 
+
+#define SET_ENDPOINT(ep, ...)       snprintf(_uri, sizeof(_uri), ep, ## __VA_ARGS__)
+#define SET_PAYLOAD(pl, ...)        snprintf(_rsp_buf, sizeof(_rsp_buf), pl, ## __VA_ARGS__)
+
+bool ApiClient::accept_challenge(const char *challenge_id)
+{
+    //LOGD("%s(%s)", __func__, challenge_id);
+
+    SET_ENDPOINT("/api/challenge/%s/accept", challenge_id);
+    return api_post(_uri);
+}
+
+bool ApiClient::decline_challenge(const char *challenge_id, const char *reason)
+{
+    //LOGD("%s(%s)", __func__, challenge_id);
+
+    SET_ENDPOINT("/api/challenge/%s/decline", challenge_id);
+    if (NULL == reason) {
+        reason = "generic";
+    }
+    return api_post(_uri, (const uint8_t *)reason, strlen(reason));
+}
+
+bool ApiClient::create_seek(const challenge_st *ps_challenge)
+{
+    int len = SET_PAYLOAD("rated=%s&time=%u&increment=%u&variant=standard&color=%s",
+                        ps_challenge->b_rated ? "true" : "false",
+                        ps_challenge->u16_clock_limit / 60, // in minutes
+                        ps_challenge->u8_clock_increment,   // in seconds
+                        ps_challenge->b_color ? "white" : "black");
+
+    LOGD("play as %s vs %s:\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, _rsp_buf);
+    return api_post("/api/board/seek", (const uint8_t *)_rsp_buf, len);
+}
+
+// create seek
+bool ApiClient::create_challenge(const challenge_st *ps_challenge, const char *fen)
+{
+    int payload_len = 0;
+
+    SET_ENDPOINT("/api/challenge/%s", ps_challenge->ac_user);
+
+    if (ps_challenge->e_player <= PLAYER_AI_LEVEL_HIGH)
+    {
+        payload_len = SET_PAYLOAD("level=%d&fen=%s",
+                        (PLAYER_AI_LEVEL_HIGH == ps_challenge->e_player) ? (8) : ((PLAYER_AI_LEVEL_MEDIUM == ps_challenge->e_player) ? (5) : (2)),
+                        fen);
+    }
+    else if ((PLAYER_BOT_MAIA9 == ps_challenge->e_player) || (PLAYER_CUSTOM == ps_challenge->e_player))
+    {
+        payload_len = SET_PAYLOAD("rated=%s&keepAliveStream=%s&rules=%s",
+                        ps_challenge->b_rated ? "true" : "false", "false", "noRematch,noClaimWin,noEarlyDraw");
+    }
+    else
+    {
+        return create_seek(ps_challenge);
+    }
+
+    payload_len += snprintf(_rsp_buf + payload_len, sizeof(_rsp_buf) - payload_len,
+                            "&clock.limit=%u&clock.increment=%u&color=%s&variant=%s",
+                            ps_challenge->u16_clock_limit,
+                            ps_challenge->u8_clock_increment,
+                            ps_challenge->b_color ? "white" : "black",
+                            "standard");
+
+    LOGD("play as %s vs %s:\r\n%s", ps_challenge->b_color ? "white" : "black", ps_challenge->ac_user, _rsp_buf);
+    return api_post(_uri, (const uint8_t *)_rsp_buf, payload_len);
+}
+
+bool ApiClient::cancel_challenge(const char *challenge_id)
+{
+    LOGD("%s(%s)", __func__, challenge_id);
+    // to do
+    delayms(1000);
+    return false;
+}
+
 } // namespace lichess

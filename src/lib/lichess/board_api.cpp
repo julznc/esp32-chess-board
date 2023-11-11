@@ -157,4 +157,42 @@ int parse_game_state(const cJSON *state, game_st *ps_game /*output*/)
     return GAME_STATE_UNKNOWN;
 }
 
+
+#define SET_ENDPOINT(ep, ...)       snprintf(_uri, sizeof(_uri), ep, ## __VA_ARGS__)
+
+// /api/board/game/{gameId}/move/{move}
+bool ApiClient::game_move(const char *game_id, const char *move_uci)
+{
+    SET_ENDPOINT("/api/board/game/%s/move/%s", game_id, move_uci);
+    return api_post(_uri);
+}
+
+// api/board/game/{gameId}/abort
+bool ApiClient::game_abort(const char *game_id)
+{
+    SET_ENDPOINT("/api/board/game/%s/abort", game_id);
+    return api_post(_uri);
+}
+
+// api/board/game/{gameId}/resign
+bool ApiClient::game_resign(const char *game_id)
+{
+    SET_ENDPOINT("/api/board/game/%s/resign", game_id);
+    return api_post(_uri);
+}
+
+// api/board/game/{gameId}/draw/{accept}
+bool ApiClient::handle_draw(const char *game_id, bool b_accept)
+{
+    SET_ENDPOINT("/api/board/game/%s/draw/%s", game_id, b_accept ? "yes" : "no");
+    return api_post(_uri);
+}
+
+// api/board/game/{gameId}/takeback/{accept}
+bool ApiClient::handle_takeback(const char *game_id, bool b_accept)
+{
+    SET_ENDPOINT("/api/board/game/%s/takeback/%s", game_id, b_accept ? "yes" : "no");
+    return api_post(_uri);
+}
+
 } // namespace lichess

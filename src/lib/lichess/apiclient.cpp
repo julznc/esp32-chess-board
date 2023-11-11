@@ -36,7 +36,9 @@ bool ApiClient::begin(const char *endpoint)
         LOGI("auth: %s", pc_token);
     }
 
-    strncpy(_uri, endpoint, sizeof(_uri) - 1);
+    if (endpoint != _uri) {
+        strncpy(_uri, endpoint, sizeof(_uri) - 1);
+    }
     LOGD("%s", _uri);
 
     return true;
@@ -299,6 +301,57 @@ bool ApiClient::api_get(const char *endpoint, cJSON **response, bool b_debug)
             LOGW("error code %d", httpCode);
             end(false);
         }
+    }
+
+    return b_status;
+}
+
+bool ApiClient::api_post(const char *endpoint, const uint8_t *payload, size_t payload_len, cJSON **response, bool b_debug)
+{
+    bool b_status = false;
+
+    if (!begin(endpoint))
+    {
+        LOGW("begin(%s) failed", endpoint);
+    }
+    else
+    {
+        int httpCode = sendRequest("POST", payload, payload_len);
+        if (httpCode > 0)
+        {
+            memset(_rsp_buf, 0, sizeof(_rsp_buf));
+            int response_len = readline(_rsp_buf, sizeof(_rsp_buf) - 1, 0);
+
+            if (b_debug) {
+                LOGD("response (%d): %s", response_len, _rsp_buf);
+            }
+
+            //if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_CREATED == httpCode) || (HTTP_CODE_MOVED_PERMANENTLY == httpCode))
+            if ((HTTP_CODE_OK == httpCode) || (HTTP_CODE_BAD_REQUEST == httpCode))
+            {
+                if (response_len > 0)
+                {
+                    if ((NULL != response) && (NULL == (*response = cJSON_Parse(_rsp_buf))))
+                    {
+                        LOGW("parse json failed (%s)", cJSON_GetErrorPtr());
+                    }
+                    else
+                    {
+                        b_status = true;
+                    }
+                }
+            }
+            else
+            {
+                LOGW("POST %s failed (%d)", endpoint, httpCode);
+            }
+        }
+        else
+        {
+            LOGW("error code %d", httpCode);
+            end(false);
+        }
+
     }
 
     return b_status;

@@ -66,7 +66,23 @@ public:
     int readline(char *buf, size_t size, uint32_t timeout);
     const char *getEndpoint() const { return _uri; }
 
+    // rest
     bool api_get(const char *endpoint, cJSON **response, bool b_debug=true);
+    bool api_post(const char *endpoint, const uint8_t *payload=NULL, size_t payload_len=0, cJSON **response=NULL, bool b_debug=true);
+
+    // board-api
+    bool game_move(const char *game_id, const char *move_uci);
+    bool game_abort(const char *game_id);
+    bool game_resign(const char *game_id);
+    bool create_seek(const challenge_st *ps_challenge);
+    bool handle_draw(const char *game_id, bool b_accept);
+    bool handle_takeback(const char *game_id, bool b_accept);
+
+    // challenges-api
+    bool accept_challenge(const char *challenge_id);
+    bool decline_challenge(const char *challenge_id, const char *reason=NULL);
+    bool create_challenge(const challenge_st *ps_challenge, const char *fen);
+    bool cancel_challenge(const char *challenge_id);
 
 protected:
     bool sendHeader(const char *type, size_t content_length=0);
@@ -74,9 +90,9 @@ protected:
 
 private:
     SecClient   _secClient;
-    char        _rsp_buf[2048];
+    char        _rsp_buf[2048]; // response | payload buffer
     char        _auth[80];
-    char        _uri[128];
+    char        _uri[128];      // endpoint buffer
     int         _returnCode = 0;
     int         _size = -1;
 

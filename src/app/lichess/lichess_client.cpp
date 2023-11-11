@@ -26,6 +26,7 @@ namespace lichess
 
 static ApiClient        main_client;    // main connection (non-stream'ed)
 static ApiClient        stream_client;
+challenge_st            s_challenge; // outgoing challenge
 static challenge_st     s_incoming_challenge;
 static game_st          s_current_game;
 static const char      *pc_last_move = "...";
@@ -33,6 +34,11 @@ static const char      *pc_last_move = "...";
 static char             ac_username[32];
 static char             payload_buff[2048];
 static uint32_t         ms_last_stream; // timestamp of last receive data
+
+static char             ac_fen[FEN_BUFF_LEN] = {0, }; // current board position
+static char             ac_prev_fen[FEN_BUFF_LEN] = {0, };
+static char             ac_uci_move[8] = {0, };
+static bool             b_opponent_changed = false;
 static uint8_t          u8_error_count;
 
 static enum {
@@ -49,7 +55,7 @@ static struct {
     nvs_handle_t    nvs;
     char            ac_token[64]; // api token
     // challenge
-    char            ac_opponent[64];
+    char            ac_opponent[32];
     uint16_t        u16_clock_limit;
     uint8_t         u8_clock_increment;
     uint8_t         b_rated;
@@ -60,6 +66,7 @@ static bool get_account();
 static int poll_events();
 static int poll_game_state();
 static void display_clock(bool b_turn, bool b_show);
+static const char *get_player_name(challenge_st *ps_challenge);
 
 
 bool init()
@@ -101,7 +108,7 @@ void loop()
         if ((u8_error_count < 10) && wifi::connected())
         {
             if (!ac_username[0]) {
-                delayms(2500); // initial delay
+                delayms(3000); // initial delay
             }
             e_state = CLIENT_STATE_GET_ACCOUNT;
         }
@@ -130,7 +137,7 @@ void loop()
         }
         else
         {
-            delayms(2500);
+            delayms(2000);
             u8_error_count++;
             e_state = CLIENT_STATE_INIT;
         }
@@ -201,6 +208,48 @@ void loop()
         break;
 
     case CLIENT_STATE_CHECK_BOARD:
+        if (!ac_fen[0] && !s_current_game.ac_id[0]) // if not yet started
+        {
+            if (chess::get_position(ac_fen))
+            {
+                if (0 != strcmp(ac_fen, START_FEN)) {
+                    s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
+                }
+                SHOW_OPPONENT(get_player_name(&s_challenge));
+                SET_BOTTOM_MSG ("Play from position ?");
+                SET_BOTTOM_MENU("<-Black       White->");
+            }
+        }
+        else if (GAME_STATE_STARTED == s_current_game.e_state) // if has on-going game
+        {
+            /*fen_stats = */chess::get_position(ac_fen, ac_uci_move);
+            bool b_turn = (NULL != strchr(ac_fen, 'w'));
+
+            if (0 != strncmp(ac_prev_fen, ac_fen, sizeof(ac_prev_fen)))
+            {
+                if ((0 != ac_uci_move[0]) && (b_turn != s_current_game.b_color))
+                {
+                    pc_last_move = " -- ";
+                    display_clock(b_turn, true);
+                    if (main_client.game_move(s_current_game.ac_id, ac_uci_move))
+                    {
+                        LOGD("send move %s ok", ac_uci_move);
+                        strncpy(ac_prev_fen, ac_fen, sizeof(ac_prev_fen));
+                    }
+                }
+            }
+
+            display_clock(b_turn, true);
+        }
+        else if (s_current_game.e_state > GAME_STATE_STARTED)
+        {
+            // finished
+            memset(ac_fen, 0, sizeof(ac_fen));
+            memset(ac_prev_fen, 0, sizeof(ac_prev_fen));
+            memset(ac_uci_move, 0, sizeof(ac_uci_move));
+        }
+        e_state = CLIENT_STATE_IDLE;
+        break;
         break;
 
     case CLIENT_STATE_GAME_FINISHED:
@@ -212,6 +261,70 @@ void loop()
         break;
 
     case CLIENT_STATE_IDLE:
+        if (GAME_STATE_STARTED == s_current_game.e_state)
+        {
+            if (RIGHT_BTN.getCount()) {
+                CLEAR_BOTTOM_MENU();
+                main_client.game_resign(s_current_game.ac_id);
+            } else if (LEFT_BTN.getCount()) {
+                CLEAR_BOTTOM_MENU();
+                main_client.game_abort(s_current_game.ac_id);
+            }
+        }
+        else if (s_incoming_challenge.ac_id[0])
+        {
+            if (RIGHT_BTN.getCount()) {
+                CLEAR_BOTTOM_MENU();
+                main_client.decline_challenge(s_incoming_challenge.ac_id);
+            } else if (LEFT_BTN.getCount()) {
+                CLEAR_BOTTOM_MENU();
+                main_client.accept_challenge(s_incoming_challenge.ac_id);
+            }
+        }
+        else if (ac_fen[0])
+        {
+            if (RIGHT_BTN.pressedDuration() >= 1200UL) {
+                RIGHT_BTN.resetCount();
+                if (s_challenge.e_player < PLAYER_LAST_IDX) {
+                    s_challenge.e_player++;
+                    if ((s_challenge.e_player > PLAYER_AI_LEVEL_HIGH) && (0 != strcmp(ac_fen, START_FEN))) {
+                        // allow custom position on AI opponent only
+                        s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
+                    }
+                }
+                SHOW_OPPONENT(get_player_name(&s_challenge));
+                b_opponent_changed = true;
+            }
+            else if (LEFT_BTN.pressedDuration() >= 1200UL) {
+                LEFT_BTN.resetCount();
+                if (s_challenge.e_player > PLAYER_FIRST_IDX) {
+                    s_challenge.e_player--;
+                }
+                SHOW_OPPONENT(get_player_name(&s_challenge));
+                b_opponent_changed = true;
+            }
+            else if (b_opponent_changed) {
+                delayms(2000UL);
+                b_opponent_changed = false;
+            }
+            else if (RIGHT_BTN.shortPressed()) {
+                CLEAR_BOTTOM_MENU();
+                SET_BOTTOM_MSG("wait for opponent...");
+                s_challenge.b_color = true;
+                if (!main_client.create_challenge(&s_challenge, ac_fen)) {
+                    SET_BOTTOM_MSG("              Retry->");
+                }
+            }
+            else if (LEFT_BTN.shortPressed()) {
+                CLEAR_BOTTOM_MENU();
+                SET_BOTTOM_MSG("wait for opponent...");
+                s_challenge.b_color = false;
+                if (!main_client.create_challenge(&s_challenge, ac_fen)) {
+                    SET_BOTTOM_MSG("<-Retry");
+                }
+            }
+        }
+        e_state = CLIENT_STATE_CHECK_EVENTS;
         break;
 
     default:
@@ -512,6 +625,34 @@ static void display_clock(bool b_turn, bool b_show)
         s_current_game.u32_btime -= ms_diff;
     }
     ms_last_update = ms_now;
+}
+
+static const char *get_player_name(challenge_st *ps_challenge)
+{
+    const char *name = "";
+
+    strncpy(ps_challenge->ac_user, "ai", sizeof(ps_challenge->ac_user));
+
+    switch (ps_challenge->e_player)
+    {
+    case PLAYER_AI_LEVEL_LOW:       name = "Stockfish level 2"; break;
+    case PLAYER_AI_LEVEL_MEDIUM:    name = "Stockfish level 5"; break;
+    case PLAYER_AI_LEVEL_HIGH:      name = "Stockfish level 8"; break;
+    case PLAYER_BOT_MAIA9:
+        strncpy(ps_challenge->ac_user, "maia9", sizeof(ps_challenge->ac_user));
+        name = ps_challenge->ac_user;
+        break;
+    case PLAYER_CUSTOM:
+        strncpy(ps_challenge->ac_user, s_configs.ac_opponent, sizeof(ps_challenge->ac_user));
+        name = ps_challenge->ac_user;
+        break;
+    case PLAYER_RANDOM_SEEK:
+        strncpy(ps_challenge->ac_user, "random", sizeof(ps_challenge->ac_user));
+        name = "random opponent";
+        break;
+    }
+
+    return name;
 }
 
 } // namespace lichess
