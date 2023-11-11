@@ -10,5 +10,6 @@
 #define CHALLENGE_DEFAULT_OPPONENT_NAME     "maia5"
 #define CHALLENGE_DEFAULT_LIMIT             (15U * 60)
 #define CHALLENGE_DEFAULT_INCREMENT         (10)
+#define CHALLENGE_MINIMUM_LIMIT             (5U * 60)
 
 extern const uint8_t LICHESS_ORG_PEM[]  asm("_binary_lichess_org_pem_start");

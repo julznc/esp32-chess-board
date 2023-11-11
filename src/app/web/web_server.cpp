@@ -3,6 +3,7 @@
 #include <esp_tls_crypto.h>
 
 #include "globals.h"
+#include "lichess/lichess_client.h"
 
 #include "wifi/wifi_setup.h"
 #include "web_server_cfg.h"
@@ -100,6 +101,34 @@ static esp_err_t request_auth(httpd_req_t *req)
 }
 #endif
 
+static void form_urldecode(char *in_out, int len)
+{
+    if (len > 1)
+    {
+        // url decode
+        const char *encoded = in_out;
+        char *decoded = in_out;
+        char temp[8] = "0x00";
+        int i = 0;
+        while (i++ < len) {
+            if ((*encoded == '%') && (i < len)) {
+                encoded++; // '%'
+                temp[2] = *encoded++;
+                temp[3] = *encoded++;
+                *decoded++ = strtol(temp, NULL, 16);
+                i += 2;
+            } else if (*encoded == '+') {
+                encoded++; // '+'
+                *decoded++ = ' ';
+            } else {
+                *decoded++ = *encoded++;
+            }
+        }
+        *decoded++ = '\0';
+        //LOGD("decoded: %s", in_out);
+    }
+}
+
 /* serve index.html */
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
@@ -135,8 +164,10 @@ esp_err_t get_version_handler(httpd_req_t *req)
 /* send lichess username */
 esp_err_t get_username_handler(httpd_req_t *req)
 {
+    const char *username = "lichess";
+    lichess::get_username(&username);
     httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "to do");
+    httpd_resp_sendstr(req, username);
     return ESP_OK;
 }
 
@@ -151,10 +182,12 @@ esp_err_t get_pgn_handler(httpd_req_t *req)
 /* send lichess game settings */
 esp_err_t get_gamecfg_handler(httpd_req_t *req)
 {
-    char        opponent[64] = "to do";
-    uint16_t    u16_limit = 15 * 60;
-    uint8_t     u8_increment = 10;
-    bool        b_rated = false;
+    const char *opponent = "..";
+    uint16_t    u16_limit = 0;
+    uint8_t     u8_increment = 0;
+    uint8_t     b_rated = false;
+
+    lichess::get_game_options(&opponent, &u16_limit, &u8_increment, &b_rated);
 
     snprintf(send_buf, sizeof(send_buf) - 1,
             "{\"opponent\": \"%s\", \"mode\": \"%s\", \"limit\":%u, \"increment\": %u}",
@@ -162,6 +195,50 @@ esp_err_t get_gamecfg_handler(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, send_buf);
+    return ESP_OK;
+}
+
+esp_err_t post_gamecfg_handler(httpd_req_t *req)
+{
+    size_t recv_len = req->content_len;
+    if (recv_len >= sizeof(recv_buf)) {
+        recv_len = sizeof(recv_buf) - 1;
+    }
+
+    memset(recv_buf, 0, sizeof(recv_buf));
+    int len = httpd_req_recv(req, recv_buf, recv_len);
+    //LOGD("(%d/%u) %.*s", len, recv_len, len, recv_buf);
+
+    form_urldecode(recv_buf, len);
+
+    //clock-limit=15&clock-increment=10&opponent=&mode=casual
+    char *limit     = strstr(recv_buf, "clock-limit=");
+    char *increment = strstr(recv_buf, "clock-increment=");
+    char *opponent  = strstr(recv_buf, "opponent=");
+    char *mode      = strstr(recv_buf, "mode=");
+
+    httpd_resp_set_type(req, "text/plain");
+
+    if ((NULL == limit) || (NULL == increment) || (NULL == opponent) || (NULL == mode))
+    {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "incomplete info");
+    }
+    else
+    {
+        const char *name = strtok(strchr(opponent, '=') + 1, "&");
+        if (name == mode) { // if empty name
+            name = "";
+        }
+        limit     = strtok(strchr(limit, '=') + 1, "&");
+        increment = strtok(strchr(increment, '=') + 1, "&");
+        mode      = strtok(strchr(mode, '=') + 1, "&");
+
+        bool b_status = lichess::set_game_options(name,
+                                atoi(limit) * 60, atoi(increment),
+                                0 == strcmp(mode, "rated"));
+        httpd_resp_sendstr(req, b_status ? "success" : "failed");
+    }
+
     return ESP_OK;
 }
 
@@ -251,6 +328,7 @@ bool start()
 
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 16;
 
     httpd_uri_t get_index = {
         .uri      = "/",
@@ -294,6 +372,13 @@ bool start()
         .user_ctx = NULL
     };
 
+    httpd_uri_t post_gamecfg = {
+        .uri      = "/lichess-game",
+        .method   = HTTP_POST,
+        .handler  = post_gamecfg_handler,
+        .user_ctx = NULL
+    };
+
     httpd_uri_t get_wificfg = {
         .uri      = "/wifi-cfg",
         .method   = HTTP_GET,
@@ -316,6 +401,7 @@ bool start()
         httpd_register_uri_handler(server, &get_username);
         httpd_register_uri_handler(server, &get_pgn);
         httpd_register_uri_handler(server, &get_gamecfg);
+        httpd_register_uri_handler(server, &post_gamecfg);
         httpd_register_uri_handler(server, &get_wificfg);
         httpd_register_uri_handler(server, &post_update);
         b_started = true;

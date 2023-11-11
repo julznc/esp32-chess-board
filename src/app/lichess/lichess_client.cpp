@@ -333,6 +333,16 @@ void loop()
     }
 }
 
+bool get_username(const char **name)
+{
+    if ((e_state > CLIENT_STATE_GET_ACCOUNT) && (NULL != name))
+    {
+        *name = ac_username;
+        return true;
+    }
+    return false;
+}
+
 bool get_token(const char **token)
 {
     esp_err_t   err;
@@ -351,6 +361,91 @@ bool get_token(const char **token)
         }
         //LOGD("token (%u): \"%s\"", len, s_configs.ac_token);
         b_status = (0 != s_configs.ac_token[0]);
+    }
+
+    return b_status;
+}
+
+bool get_game_options(const char **opponent, uint16_t *clock_limit, uint8_t *clock_increment, uint8_t *rated)
+{
+    esp_err_t   err;
+    size_t      opp_len = sizeof(s_configs.ac_opponent);
+
+    if (ESP_OK != (err = nvs_get_str(s_configs.nvs, "opponent", s_configs.ac_opponent, &opp_len)))
+    {
+        //LOGW("nvs_get_str() = %d", err);
+        strncpy(s_configs.ac_opponent, CHALLENGE_DEFAULT_OPPONENT_NAME, sizeof(s_configs.ac_opponent));
+    }
+
+    if (ESP_OK != (err = nvs_get_u16(s_configs.nvs, "clock_limit", &s_configs.u16_clock_limit)))
+    {
+        //LOGW("nvs_get_u16() = %d", err);
+        s_configs.u16_clock_limit = CHALLENGE_DEFAULT_LIMIT;
+    }
+
+    if (ESP_OK != (err = nvs_get_u8(s_configs.nvs, "clock_increment", &s_configs.u8_clock_increment)))
+    {
+        //LOGW("nvs_get_u8() = %d", err);
+        s_configs.u8_clock_increment = CHALLENGE_DEFAULT_INCREMENT;
+    }
+
+    if (ESP_OK != (err = nvs_get_u8(s_configs.nvs, "rated", &s_configs.b_rated)))
+    {
+        //LOGW("nvs_get_u8() = %d", err);
+        s_configs.b_rated = false;
+    }
+
+    if (opponent) {
+        *opponent = s_configs.ac_opponent;
+    }
+
+    if (clock_limit) {
+        *clock_limit = s_configs.u16_clock_limit;
+    }
+    if (clock_increment) {
+        *clock_increment = s_configs.u8_clock_increment;
+    }
+    if (rated) {
+        *rated = s_configs.b_rated;
+    }
+
+    return true;
+}
+
+bool set_game_options(const char *opponent, uint16_t clock_limit, uint8_t clock_increment, uint8_t rated)
+{
+    esp_err_t   err;
+    bool        b_status = false;
+
+    LOGD("opts \"%s\", %u, %u, %u", opponent, clock_limit, clock_increment, rated);
+
+    if ((NULL == opponent) && (clock_limit < CHALLENGE_MINIMUM_LIMIT))
+    {
+        //
+    }
+    else if (ESP_OK != (err = nvs_set_str(s_configs.nvs, "opponent", opponent)))
+    {
+        //LOGW("nvs_set_str() = %d", err);
+    }
+    else if (ESP_OK != (err = nvs_set_u16(s_configs.nvs, "clock_limit", clock_limit)))
+    {
+        //LOGW("nvs_set_u16() = %d", err);
+    }
+    else if (ESP_OK != (err = nvs_set_u8(s_configs.nvs, "clock_increment", clock_increment)))
+    {
+        //LOGW("nvs_set_u8() = %d", err);
+    }
+    else if (ESP_OK != (err = nvs_set_u8(s_configs.nvs, "rated", rated)))
+    {
+        //LOGW("nvs_set_u8() = %d", err);
+    }
+    else if (ESP_OK != (err = nvs_commit(s_configs.nvs)))
+    {
+        LOGW("nvs_commit() = %d", err);
+    }
+    else
+    {
+        b_status = get_game_options(NULL, NULL, NULL, NULL);
     }
 
     return b_status;
