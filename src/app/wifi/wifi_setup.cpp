@@ -271,15 +271,15 @@ bool set_credentials(const char *ssid, const char *passwd)
     }
     else if (ESP_OK != (err = nvs_set_str(s_configs.nvs, "ssid", ssid)))
     {
-        LOGW("nvs_set_str() = %d", err);
+        //LOGW("nvs_set_str() = %d", err);
     }
     else if (ESP_OK != (err = nvs_set_str(s_configs.nvs, "passwd", passwd)))
     {
-        LOGW("nvs_set_str() = %d", err);
+        //LOGW("nvs_set_str() = %d", err);
     }
     else if (ESP_OK != (err = nvs_commit(s_configs.nvs)))
     {
-        LOGW("nvs_commit() = %d", err);
+        //LOGW("nvs_commit() = %d", err);
     }
     else
     {
@@ -528,7 +528,8 @@ static void soft_ap()
         if (ESP_OK == esp_netif_get_ip_info(ap_netif, &ip_info))
         {
             LOGI("IP aadr: " IPSTR, IP2STR(&ip_info.ip));
-            SHOW_STATUS("%s-" IPSTR, AP_SSID_PREFIX, IP2STR(&ip_info.ip));
+            //SHOW_STATUS("%s-" IPSTR, AP_SSID_PREFIX, IP2STR(&ip_info.ip));
+            SHOW_STATUS("%s-" IPSTR, "AP", IP2STR(&ip_info.ip));
         }
         else
         {

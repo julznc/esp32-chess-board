@@ -132,7 +132,7 @@ static void form_urldecode(char *in_out, int len)
 /* serve index.html */
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-esp_err_t get_index_handler(httpd_req_t *req)
+esp_err_t get_indexhtml_handler(httpd_req_t *req)
 {
 #ifdef WEB_SERVER_BASIC_AUTH
     if (!authenticate(req)) {
@@ -242,6 +242,36 @@ esp_err_t post_gamecfg_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t post_apitoken_handler(httpd_req_t *req)
+{
+    size_t recv_len = req->content_len;
+    if (recv_len >= sizeof(recv_buf)) {
+        recv_len = sizeof(recv_buf) - 1;
+    }
+
+    memset(recv_buf, 0, sizeof(recv_buf));
+    int len = httpd_req_recv(req, recv_buf, recv_len);
+    //LOGD("(%d/%u) %.*s", len, recv_len, len, recv_buf);
+
+    form_urldecode(recv_buf, len);
+    httpd_resp_set_type(req, "text/plain");
+
+    char *token = strstr(recv_buf, "token=");
+
+    if (NULL == token)
+    {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "empty");
+    }
+    else
+    {
+        token = strtok(strchr(token, '=') + 1, "&");
+        bool b_status = lichess::set_token(token);
+        httpd_resp_sendstr(req, b_status ? "success" : "failed");
+    }
+
+    return ESP_OK;
+}
+
 /* send wifi credentials */
 esp_err_t get_wificfg_handler(httpd_req_t *req)
 {
@@ -253,6 +283,40 @@ esp_err_t get_wificfg_handler(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, send_buf);
+    return ESP_OK;
+}
+
+esp_err_t post_wificfg_handler(httpd_req_t *req)
+{
+    size_t recv_len = req->content_len;
+    if (recv_len >= sizeof(recv_buf)) {
+        recv_len = sizeof(recv_buf) - 1;
+    }
+
+    memset(recv_buf, 0, sizeof(recv_buf));
+    int len = httpd_req_recv(req, recv_buf, recv_len);
+    //LOGD("(%d/%u) %.*s", len, recv_len, len, recv_buf);
+
+    form_urldecode(recv_buf, len);
+
+    char *ssid   = strstr(recv_buf, "ssid=");
+    char *passwd = strstr(recv_buf, "passwd=");
+
+    httpd_resp_set_type(req, "text/plain");
+
+    if ((NULL == ssid) || (NULL == passwd))
+    {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "incomplete info");
+    }
+    else
+    {
+        ssid   = strtok(strchr(ssid, '=') + 1, "&");
+        passwd = strtok(strchr(passwd, '=') + 1, "&");
+
+        bool b_status = wifi::set_credentials(ssid, passwd);
+        httpd_resp_sendstr(req, b_status ? "success" : "failed");
+    }
+
     return ESP_OK;
 }
 
@@ -318,6 +382,51 @@ esp_err_t post_update_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+// reboot or clear configs
+esp_err_t post_reset_handler(httpd_req_t *req)
+{
+    size_t recv_len = req->content_len;
+    if (recv_len >= sizeof(recv_buf)) {
+        recv_len = sizeof(recv_buf) - 1;
+    }
+
+    memset(recv_buf, 0, sizeof(recv_buf));
+    /*int len = */httpd_req_recv(req, recv_buf, recv_len);
+    //LOGD("(%d/%u) %.*s", len, recv_len, len, recv_buf);
+
+    httpd_resp_set_type(req, "text/plain");
+
+    if (NULL != strstr(recv_buf, "restart"))
+    {
+        httpd_resp_sendstr(req, "app reset");
+        delayms(3000UL);
+        esp_restart();
+    }
+    else if (NULL != strstr(recv_buf, "restore"))
+    {
+        int err = 0;
+        err += nvs_flash_deinit();
+        //LOGD("nvs_flash_deinit() = %d", err);
+        err += nvs_flash_erase();
+        //LOGD("nvs_flash_erase() = %d", err);
+        err += nvs_flash_init();
+        //LOGD("nvs_flash_init() = %d", err);
+        if (0 != err) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "restore factory settings failed");
+        } else {
+            httpd_resp_sendstr(req, "restore factory settings success");
+        }
+        delayms(3000UL);
+        esp_restart();
+    }
+    else
+    {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "unknown reset");
+    }
+
+    return ESP_OK;
+}
+
 bool start()
 {
     static bool b_started = false;
@@ -330,80 +439,35 @@ bool start()
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 16;
 
-    httpd_uri_t get_index = {
-        .uri      = "/",
-        .method   = HTTP_GET,
-        .handler  = get_index_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t get_favicon = {
-        .uri      = "/favicon.ico",
-        .method   = HTTP_GET,
-        .handler  = get_favicon_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t get_version = {
-        .uri      = "/version",
-        .method   = HTTP_GET,
-        .handler  = get_version_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t get_username = {
-        .uri      = "/username",
-        .method   = HTTP_GET,
-        .handler  = get_username_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t get_pgn = {
-        .uri      = "/pgn",
-        .method   = HTTP_GET,
-        .handler  = get_pgn_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t get_gamecfg = {
-        .uri      = "/lichess-game",
-        .method   = HTTP_GET,
-        .handler  = get_gamecfg_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t post_gamecfg = {
-        .uri      = "/lichess-game",
-        .method   = HTTP_POST,
-        .handler  = post_gamecfg_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t get_wificfg = {
-        .uri      = "/wifi-cfg",
-        .method   = HTTP_GET,
-        .handler  = get_wificfg_handler,
-        .user_ctx = NULL
-    };
-
-    httpd_uri_t post_update = {
-        .uri      = "/update",
-        .method   = HTTP_POST,
-        .handler  = post_update_handler,
-        .user_ctx = NULL
-    };
-
     if (ESP_OK == httpd_start(&server, &config))
     {
-        httpd_register_uri_handler(server, &get_index);
-        httpd_register_uri_handler(server, &get_favicon);
-        httpd_register_uri_handler(server, &get_version);
-        httpd_register_uri_handler(server, &get_username);
-        httpd_register_uri_handler(server, &get_pgn);
-        httpd_register_uri_handler(server, &get_gamecfg);
-        httpd_register_uri_handler(server, &post_gamecfg);
-        httpd_register_uri_handler(server, &get_wificfg);
-        httpd_register_uri_handler(server, &post_update);
+
+  #define REGISTER_HANDLER(_handler, _uri, _method, func)   \
+                httpd_uri_t _handler = {                    \
+                    .uri = _uri, .method = _method,         \
+                    .handler = func, .user_ctx = NULL       \
+                };                                          \
+                httpd_register_uri_handler(server, &_handler)
+
+  #define REGISTER_POST_HANDLER(uri, func)  REGISTER_HANDLER(post_ ## func, uri, HTTP_POST, post_ ## func ## _handler)
+  #define REGISTER_GET_HANDLER(uri, func)   REGISTER_HANDLER(get_ ## func, uri, HTTP_GET, get_ ## func ## _handler)
+
+        REGISTER_GET_HANDLER("/", indexhtml);
+        REGISTER_GET_HANDLER("/favicon.ico", favicon);
+        REGISTER_GET_HANDLER("/version", version);
+        REGISTER_GET_HANDLER("/username", username);
+        REGISTER_GET_HANDLER("/pgn", pgn);
+
+        REGISTER_GET_HANDLER("/lichess-game", gamecfg);
+        REGISTER_POST_HANDLER("/lichess-game", gamecfg);
+        REGISTER_POST_HANDLER("/lichess-token", apitoken); // lip_l4491VHNfYPMT9V7bQPQ
+
+        REGISTER_GET_HANDLER("/wifi-cfg", wificfg);
+        REGISTER_POST_HANDLER("/wifi-cfg", wificfg);
+
+        REGISTER_POST_HANDLER("/update", update);
+        REGISTER_POST_HANDLER("/reset", reset);
+
         b_started = true;
     }
 
