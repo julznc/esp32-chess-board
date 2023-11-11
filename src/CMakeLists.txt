@@ -20,6 +20,8 @@ idf_component_register(
         "lib/graphics/graphics.cpp"
         "lib/led_strip/led_strip_encoder.c"
         "lib/lichess/apiclient.cpp"
+        "lib/lichess/board_api.cpp"
+        "lib/lichess/challenges_api.cpp"
         "lib/lichess/secclient.cpp"
         "lib/mfrc522/mfrc522.cpp"
         "lib/oledmono/oledmono.cpp"

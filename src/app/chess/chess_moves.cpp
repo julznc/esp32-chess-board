@@ -165,7 +165,7 @@ void make_move(game_st *p_game, const move_st *move)
 
         /* if pawn promotion, replace with new piece */
         if (move->flags & BIT_PROMOTION) {
-            board[move->to] = MAKE_PIECE(us, move->promoted ? move->promoted : QUEEN);
+            board[move->to] = MAKE_PIECE(us, move->promoted ? move->promoted : (uint8_t)QUEEN);
         }
     }
 
@@ -272,8 +272,8 @@ move_st *generate_moves(game_st *p_game)
             continue;
         //LOGD("piece %02x @ %d", piece, i);
 
-        uint8_t row = RANK(i);
-        uint8_t col = FILE(i);
+        //uint8_t row = RANK(i);
+        //uint8_t col = FILE(i);
         uint8_t type= PIECE_TYPE(piece);
 
         if (PAWN == type)

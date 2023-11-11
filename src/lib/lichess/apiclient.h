@@ -5,6 +5,9 @@
 
 #include "apiclient_cfg.h"
 #include "secclient.h"
+#include "board_api.h"
+#include "challenges_api.h"
+
 
 
 namespace lichess
@@ -36,6 +39,18 @@ typedef enum {
     HTTPC_ERROR_READ_TIMEOUT        = (-11)
 } http_client_error_et;
 
+
+
+typedef enum {
+    EVENT_UNKNOWN,
+    EVENT_GAME_START,
+    EVENT_GAME_FINNISH,
+    EVENT_CHALLENGE_INCOMING,
+    EVENT_CHALLENGE_CANCELED,
+    EVENT_CHALLENGE_DECLINED,
+} event_type_et;
+
+
 class ApiClient
 {
 public:
@@ -47,7 +62,9 @@ public:
     bool connected() { return _secClient.connected(); };
     void end(bool b_stop /*close ssl connection*/);
     int sendRequest(const char *type, const uint8_t *payload=NULL, size_t size=0);
+    bool startStream(const char *endpoint);
     int readline(char *buf, size_t size, uint32_t timeout);
+    const char *getEndpoint() const { return _uri; }
 
     bool api_get(const char *endpoint, cJSON **response, bool b_debug=true);
 

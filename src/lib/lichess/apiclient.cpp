@@ -120,6 +120,37 @@ int ApiClient::sendRequest(const char *type, const uint8_t *payload, size_t size
     return code;
 }
 
+bool ApiClient::startStream(const char *endpoint)
+{
+    int     code        = 0;
+    bool    b_status    = false;
+
+    // to do: handle redirects, if any
+
+    if (begin(endpoint))
+    {
+        if (!connect())
+        {
+            //LOGW("connect() failed");
+        }
+        else if (!sendHeader("GET"))
+        {
+            LOGW("sendHeader() failed");
+        }
+        else if ((code = handleHeaderResponse()) > 0)
+        {
+            b_status = (HTTP_CODE_OK == code);
+        }
+    }
+
+    if (!b_status) {
+        //LOGW("stream(%s) failed", endpoint);
+        end(true);
+    }
+
+    return b_status;
+}
+
 int ApiClient::readline(char *buf, size_t size, uint32_t timeout)
 {
     if (_secClient.available())
