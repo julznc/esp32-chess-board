@@ -39,7 +39,10 @@ form input { margin: 2px auto;}
     <label class="tab-label" for="tab-1">Home</label>
     <div class="panel">
       <fieldset><legend>Info</legend> <a id="txt-username" target="_blank">...</a><br><span id="txt-ver">...</span><br></fieldset><br>
-      <fieldset><legend>PGN</legend><span id="txt-pgn">...</span><br></fieldset>
+      <fieldset> <legend>Board</legend>
+        <a id="txt-fen" target="_blank" style="font-size: smaller;">...</a><br>
+        <span id="txt-pgn" style="font-size: smaller;">...</span><br>
+      </fieldset>
     </div>
 
     <input class="tab-input" name="tabs" type="radio" id="tab-2"/>
@@ -92,29 +95,35 @@ form input { margin: 2px auto;}
 
   <script type="text/javascript">
 (function() {
-  fetch("/username").then(function(rsp) {
-    rsp.text().then(function (txt) {
-      const txt_username = document.getElementById("txt-username");
-      if (txt.length >= 3) { txt_username.innerText = "@" + txt; txt_username.setAttribute("href", "https://lichess.org/@/" + txt); }
-      else { txt_username.innerText = "unknown Lichess account"; txt_username.style.color = "#e00"; }
-    });
-  }).catch(function(err){ console.log(err); });
   fetch("/version").then(function(rsp) {
-    rsp.text().then(function (txt) { document.getElementById("txt-ver").innerText = "FW v" + txt; });
+    rsp.text().then(function (ver) { document.getElementById("txt-ver").innerText = "FW v" + ver; });
+      fetch("/username").then(function(rsp) {
+        rsp.text().then(function (name) {
+          var txt_username = document.getElementById("txt-username");
+          if (name.length >= 3) { txt_username.innerText = "@" + name; txt_username.setAttribute("href", "https://lichess.org/@/" + name); }
+          else { txt_username.innerText = "unknown Lichess account"; txt_username.style.color = "#e00"; }
+        });
+      }).catch(function(err){ console.log(err); });
   }).catch(function(err){ console.log(err); });
-  fetch("/pgn").then(function(rsp) {
-    rsp.text().then(function (txt) { document.getElementById("txt-pgn").innerText = txt; });
-  }).catch(function(err){ console.log(err); });
-  fetch("/lichess-game").then(function(rsp) {
-    rsp.json().then(function (cfg) {
-      document.querySelector('input[name="clock-limit"]').value = cfg.limit;
-      document.querySelector('input[name="clock-increment"]').value = cfg.increment;
-      document.querySelector('input[name="opponent"]').value = cfg.opponent;
-      document.getElementById(cfg.mode).checked = true;
+  fetch("/fen").then(function(rsp) {
+    rsp.text().then(function (fen) {
+      var txt_fen = document.getElementById("txt-fen"); txt_fen.innerText = fen;
+      txt_fen.setAttribute("href", "https://lichess.org/analysis/" + fen.replace(' ', '_'));
+      fetch("/pgn").then(function(rsp) {
+        rsp.text().then(function (pgn) { document.getElementById("txt-pgn").innerText = pgn; });
+      }).catch(function(err){ console.log(err); });
     });
   }).catch(function(err){ console.log(err); });
   fetch("/wifi-cfg").then(function(rsp) {
     rsp.json().then(function (creds) { document.querySelector('input[name="ssid"]').value = creds.ssid; });
+    fetch("/lichess-game").then(function(rsp) {
+      rsp.json().then(function (cfg) {
+        document.querySelector('input[name="clock-limit"]').value = cfg.limit;
+        document.querySelector('input[name="clock-increment"]').value = cfg.increment;
+        document.querySelector('input[name="opponent"]').value = cfg.opponent;
+        document.getElementById(cfg.mode).checked = true;
+      });
+    }).catch(function(err){ console.log(err); });
   }).catch(function(err){ console.log(err); });
 })();
 

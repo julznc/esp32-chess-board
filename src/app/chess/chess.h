@@ -31,10 +31,10 @@ typedef enum {
 #define VALID_PIECE(u7_type)            ((chess::PAWN==u7_type) || (chess::KNIGHT==u7_type) || (chess::BISHOP==u7_type) || \
                                          (chess::ROOK==u7_type) || (chess::QUEEN==u7_type)  || (chess::KING==u7_type))
 
-#define START_FEN                       "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+extern const char *START_FEN;
+#define IS_START_FEN(fen)               ((fen == chess::START_FEN) || (0 == strncmp(fen, chess::START_FEN, 43)))
 #define FEN_BUFF_LEN                    (80)
 #define PGN_BUFF_LEN                    (2048)
-#define IS_START_FEN(fen)               (0 == strncmp(fen, START_FEN, 43))
 
 typedef enum {
     a8 =   0, b8 =   1, c8 =   2, d8 =   3, e8 =   4, f8 =   5, g8 =   6, h8 =   7,
@@ -131,8 +131,8 @@ const char *color_to_string(uint8_t b_color);
 const char *piece_to_string(uint8_t u7_type);
 
 // api's
-const stats_st *get_position(char *fen /*current position*/, char *move /*last uci move*/);
-bool get_position(char *fen);
+const stats_st *get_position(const char **fen /*current position*/, char *move /*last uci move*/);
+bool get_position(const char **fen);
 bool get_last_move(char *move /*uci*/);
 bool get_pgn(const char **pgn);
 bool continue_game(const char *expected_fen); // continue game from position

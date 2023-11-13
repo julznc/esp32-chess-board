@@ -8,6 +8,8 @@
 namespace chess
 {
 
+const char *START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
 static game_st          s_game;
 SemaphoreHandle_t       mtx = NULL;
 static move_st          last_move;
@@ -622,12 +624,12 @@ const char *piece_to_string(uint8_t u7_type)
     return "UNKNOWN";
 }
 
-const stats_st *get_position(char *fen /*current position*/, char *move /*last move*/)
+const stats_st *get_position(const char **fen /*current position*/, char *move /*last move*/)
 {
     lock();
-    if (s_game.stats.valid)
+    if (s_game.stats.valid && (NULL != fen))
     {
-        strncpy(fen, generate_fen(&s_game), FEN_BUFF_LEN);
+        *fen = ac_fen_buf;
     }
     unlock();
 
@@ -635,14 +637,14 @@ const stats_st *get_position(char *fen /*current position*/, char *move /*last m
     return &s_game.stats;
 }
 
-bool get_position(char *fen)
+bool get_position(const char **fen)
 {
     bool b_status = false;
     lock();
     b_status = s_game.stats.valid;
-    if (b_status)
+    if (b_status && (NULL != fen))
     {
-        strncpy(fen, generate_fen(&s_game), FEN_BUFF_LEN);
+        *fen = ac_fen_buf;
     }
     unlock();
     return b_status;
@@ -679,21 +681,23 @@ bool get_pgn(const char **pgn)
     {
         uint16_t total_moves = s_game.stats.move_number;
         char    *ptr         = ac_pgn_buf;
-        size_t   len         = 0;
+        char    *ptr_end     = ptr + sizeof(ac_pgn_buf) - 20;
 
         lock();
         memset(ac_pgn_buf, 0, sizeof(ac_pgn_buf));
         if (WHITE == s_game.stats.turn) {
             total_moves--;
         }
-        for (uint16_t move_num = 1; (move_num <= total_moves) && (len < sizeof(ac_pgn_buf) - 1); move_num++)
+        for (uint16_t move_idx = 0; move_idx < total_moves; move_idx++)
         {
-            len += snprintf(ptr, sizeof(ac_pgn_buf) - len,
-                            "%u. %s %s ", move_num,
-                            s_move_stack[move_num -1].san_white,
-                            s_move_stack[move_num -1].san_black);
-            ptr += len;
+            ptr += snprintf(ptr, 20, "%u. %s %s ", move_idx + 1,
+                            s_move_stack[move_idx].san_white,
+                            s_move_stack[move_idx].san_black);
+
+            if (ptr > ptr_end)
+                break;
         }
+        //LOGD("pgn(%u) %s", total_moves, ac_pgn_buf);
         *pgn = total_moves ? ac_pgn_buf : NULL;
         unlock();
     }

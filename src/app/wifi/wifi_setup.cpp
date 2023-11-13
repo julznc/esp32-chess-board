@@ -89,6 +89,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         break;
 
     case WIFI_EVENT_STA_DISCONNECTED:
+        s_found_aps.b_connected = false;
         if (++u8_retry_connect > MAX_CONNECT_RETRIES) {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
             LOGW("connect to the AP failed");

@@ -35,7 +35,7 @@ static char             ac_username[32];
 static char             payload_buff[2048];
 static uint32_t         ms_last_stream; // timestamp of last receive data
 
-static char             ac_fen[FEN_BUFF_LEN] = {0, }; // current board position
+static const char      *pc_fen = NULL; // current board position
 static char             ac_prev_fen[FEN_BUFF_LEN] = {0, };
 static char             ac_uci_move[8] = {0, };
 static bool             b_opponent_changed = false;
@@ -218,11 +218,11 @@ void loop()
         break;
 
     case CLIENT_STATE_CHECK_BOARD:
-        if (!ac_fen[0] && !s_current_game.ac_id[0]) // if not yet started
+        if ((NULL == pc_fen) && !s_current_game.ac_id[0]) // if not yet started
         {
-            if (chess::get_position(ac_fen))
+            if (chess::get_position(&pc_fen))
             {
-                if (0 != strcmp(ac_fen, START_FEN)) {
+                if (!IS_START_FEN(pc_fen)) {
                     s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
                 }
                 SHOW_OPPONENT(get_player_name(&s_challenge));
@@ -232,10 +232,10 @@ void loop()
         }
         else if (GAME_STATE_STARTED == s_current_game.e_state) // if has on-going game
         {
-            /*fen_stats = */chess::get_position(ac_fen, ac_uci_move);
-            bool b_turn = (NULL != strchr(ac_fen, 'w'));
+            /*fen_stats = */chess::get_position(&pc_fen, ac_uci_move);
+            bool b_turn = (NULL != strchr(pc_fen, 'w'));
 
-            if (0 != strncmp(ac_prev_fen, ac_fen, sizeof(ac_prev_fen)))
+            if (0 != strncmp(ac_prev_fen, pc_fen, sizeof(ac_prev_fen)))
             {
                 if ((0 != ac_uci_move[0]) && (b_turn != s_current_game.b_color))
                 {
@@ -244,7 +244,7 @@ void loop()
                     if (main_client.game_move(s_current_game.ac_id, ac_uci_move))
                     {
                         LOGD("send move %s ok", ac_uci_move);
-                        strncpy(ac_prev_fen, ac_fen, sizeof(ac_prev_fen));
+                        strncpy(ac_prev_fen, pc_fen, sizeof(ac_prev_fen) - 1);
                     }
                 }
             }
@@ -254,7 +254,7 @@ void loop()
         else if (s_current_game.e_state > GAME_STATE_STARTED)
         {
             // finished
-            memset(ac_fen, 0, sizeof(ac_fen));
+            pc_fen = NULL;
             memset(ac_prev_fen, 0, sizeof(ac_prev_fen));
             memset(ac_uci_move, 0, sizeof(ac_uci_move));
         }
@@ -291,13 +291,13 @@ void loop()
                 main_client.accept_challenge(s_incoming_challenge.ac_id);
             }
         }
-        else if (ac_fen[0])
+        else if (NULL != pc_fen)
         {
             if (RIGHT_BTN.pressedDuration() >= 1200UL) {
                 RIGHT_BTN.resetCount();
                 if (s_challenge.e_player < PLAYER_LAST_IDX) {
                     s_challenge.e_player++;
-                    if ((s_challenge.e_player > PLAYER_AI_LEVEL_HIGH) && (0 != strcmp(ac_fen, START_FEN))) {
+                    if ((s_challenge.e_player > PLAYER_AI_LEVEL_HIGH) && (!IS_START_FEN(pc_fen))) {
                         // allow custom position on AI opponent only
                         s_challenge.e_player = PLAYER_AI_LEVEL_HIGH;
                     }
@@ -321,7 +321,7 @@ void loop()
                 CLEAR_BOTTOM_MENU();
                 SET_BOTTOM_MSG("wait for opponent...");
                 s_challenge.b_color = true;
-                if (!main_client.create_challenge(&s_challenge, ac_fen)) {
+                if (!main_client.create_challenge(&s_challenge, pc_fen)) {
                     SET_BOTTOM_MSG("              Retry->");
                 }
             }
@@ -329,7 +329,7 @@ void loop()
                 CLEAR_BOTTOM_MENU();
                 SET_BOTTOM_MSG("wait for opponent...");
                 s_challenge.b_color = false;
-                if (!main_client.create_challenge(&s_challenge, ac_fen)) {
+                if (!main_client.create_challenge(&s_challenge, pc_fen)) {
                     SET_BOTTOM_MSG("<-Retry");
                 }
             }

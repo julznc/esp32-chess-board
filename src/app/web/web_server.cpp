@@ -172,6 +172,16 @@ esp_err_t get_username_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* send current position */
+esp_err_t get_fen_handler(httpd_req_t *req)
+{
+    const char *fen = "...";
+    chess::get_position(&fen);
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req, fen);
+    return ESP_OK;
+}
+
 /* send current PGN */
 esp_err_t get_pgn_handler(httpd_req_t *req)
 {
@@ -459,6 +469,7 @@ bool start()
         REGISTER_GET_HANDLER("/favicon.ico", favicon);
         REGISTER_GET_HANDLER("/version", version);
         REGISTER_GET_HANDLER("/username", username);
+        REGISTER_GET_HANDLER("/fen", fen);
         REGISTER_GET_HANDLER("/pgn", pgn);
 
         REGISTER_GET_HANDLER("/lichess-game", gamecfg);
