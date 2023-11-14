@@ -33,6 +33,7 @@ idf_component_register(
         "lib"
     EMBED_FILES
         "app/web/index.html"
+        "app/web/board.html"
         "app/web/favicon.svg"
         "lib/lichess/lichess-org.pem"
     REQUIRES

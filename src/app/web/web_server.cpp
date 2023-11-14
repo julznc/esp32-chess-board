@@ -144,6 +144,19 @@ esp_err_t get_indexhtml_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+extern const uint8_t board_html_start[] asm("_binary_board_html_start");
+extern const uint8_t board_html_end[] asm("_binary_board_html_end");
+esp_err_t get_boardhtml_handler(httpd_req_t *req)
+{
+#ifdef WEB_SERVER_BASIC_AUTH
+    if (!authenticate(req)) {
+        return request_auth(req);
+    }
+#endif
+    httpd_resp_send(req, (const char *) board_html_start, board_html_end - board_html_start);
+    return ESP_OK;
+}
+
 /* serve favicon */
 extern const uint8_t favicon_svg_start[] asm("_binary_favicon_svg_start");
 extern const uint8_t favicon_svg_end[] asm("_binary_favicon_svg_end");
@@ -179,6 +192,8 @@ esp_err_t get_fen_handler(httpd_req_t *req)
     chess::get_position(&fen);
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_sendstr(req, fen);
+
+    //LOGD("%s: heaps %u %u", __func__, heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     return ESP_OK;
 }
 
@@ -466,6 +481,7 @@ bool start()
   #define REGISTER_GET_HANDLER(uri, func)   REGISTER_HANDLER(get_ ## func, uri, HTTP_GET, get_ ## func ## _handler)
 
         REGISTER_GET_HANDLER("/", indexhtml);
+        REGISTER_GET_HANDLER("/board", boardhtml);
         REGISTER_GET_HANDLER("/favicon.ico", favicon);
         REGISTER_GET_HANDLER("/version", version);
         REGISTER_GET_HANDLER("/username", username);
