@@ -207,6 +207,27 @@ esp_err_t get_pgn_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t post_queuemove_handler(httpd_req_t *req)
+{
+    const char *move = strstr(req->uri, "move=");
+    httpd_resp_set_type(req, "text/plain");
+    if (NULL == move)
+    {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "unknown move");
+    }
+    else
+    {
+        move = strchr(move, '=') + 1;
+        //LOGD("%s(%s)", __func__, move);
+        if (!chess::queue_move(move)) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "failed");
+        } else {
+            httpd_resp_sendstr(req, "ok");
+        }
+    }
+    return ESP_OK;
+}
+
 /* send lichess game settings */
 esp_err_t get_gamecfg_handler(httpd_req_t *req)
 {
@@ -487,10 +508,11 @@ bool start()
         REGISTER_GET_HANDLER("/username", username);
         REGISTER_GET_HANDLER("/fen", fen);
         REGISTER_GET_HANDLER("/pgn", pgn);
+        REGISTER_POST_HANDLER("/queue", queuemove);
 
         REGISTER_GET_HANDLER("/lichess-game", gamecfg);
         REGISTER_POST_HANDLER("/lichess-game", gamecfg);
-        REGISTER_POST_HANDLER("/lichess-token", apitoken); // lip_l4491VHNfYPMT9V7bQPQ
+        REGISTER_POST_HANDLER("/lichess-token", apitoken);
 
         REGISTER_GET_HANDLER("/wifi-cfg", wificfg);
         REGISTER_POST_HANDLER("/wifi-cfg", wificfg);
