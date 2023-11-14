@@ -161,9 +161,13 @@ int parse_game_state(const cJSON *state, game_st *ps_game /*output*/)
 #define SET_ENDPOINT(ep, ...)       snprintf(_uri, sizeof(_uri), ep, ## __VA_ARGS__)
 
 // /api/board/game/{gameId}/move/{move}
-bool ApiClient::game_move(const char *game_id, const char *move_uci)
+bool ApiClient::game_move(const char *game_id, const char *move_uci, bool draw)
 {
     SET_ENDPOINT("/api/board/game/%s/move/%s", game_id, move_uci);
+    if (draw) {
+        // offer (or agree to) a draw
+        strcat(_uri, "?offeringDraw=true");
+    }
     return api_post(_uri);
 }
 

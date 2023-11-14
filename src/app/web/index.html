@@ -39,7 +39,7 @@ form input { margin: 2px auto;}
     <label class="tab-label" for="tab-1">Home</label>
     <div class="panel">
       <fieldset><legend>Info</legend> <a id="txt-username" target="_blank">...</a><br><span id="txt-ver">...</span><br></fieldset><br>
-      <fieldset> <legend>Board</legend>
+      <fieldset> <legend><a href="/board" target="_blank">Board</a></legend>
         <a id="txt-fen" target="_blank" style="font-size: smaller;">...</a><br>
         <span id="txt-pgn" style="font-size: smaller;">...</span><br>
       </fieldset>
@@ -107,8 +107,7 @@ form input { margin: 2px auto;}
   }).catch(function(err){ console.log(err); });
   fetch("/fen").then(function(rsp) {
     rsp.text().then(function (fen) {
-      var txt_fen = document.getElementById("txt-fen"); txt_fen.innerText = fen;
-      txt_fen.setAttribute("href", "https://lichess.org/analysis/" + fen.replace(' ', '_'));
+      document.getElementById("txt-fen").innerText = fen;
       fetch("/pgn").then(function(rsp) {
         rsp.text().then(function (pgn) { document.getElementById("txt-pgn").innerText = pgn; });
       }).catch(function(err){ console.log(err); });

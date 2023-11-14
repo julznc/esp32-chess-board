@@ -38,6 +38,8 @@ static uint32_t         ms_last_stream; // timestamp of last receive data
 static const char      *pc_fen = NULL; // current board position
 static char             ac_prev_fen[FEN_BUFF_LEN] = {0, };
 static char             ac_uci_move[8] = {0, };
+static bool             b_offer_draw = false;
+static bool             b_has_moved = false;
 static bool             b_opponent_changed = false;
 static uint8_t          u8_error_count;
 
@@ -241,10 +243,15 @@ void loop()
                 {
                     pc_last_move = " -- ";
                     display_clock(b_turn, true);
-                    if (main_client.game_move(s_current_game.ac_id, ac_uci_move))
+                    if (main_client.game_move(s_current_game.ac_id, ac_uci_move, b_offer_draw))
                     {
                         LOGD("send move %s ok", ac_uci_move);
                         strncpy(ac_prev_fen, pc_fen, sizeof(ac_prev_fen) - 1);
+                        if (!b_has_moved) {
+                            SET_BOTTOM_MENU("<-Draw       Resign->");
+                            b_has_moved = true;
+                        }
+                        b_offer_draw = false;
                     }
                 }
             }
@@ -255,6 +262,8 @@ void loop()
         {
             // finished
             pc_fen = NULL;
+            b_offer_draw = false;
+            b_has_moved = false;
             memset(ac_prev_fen, 0, sizeof(ac_prev_fen));
             memset(ac_uci_move, 0, sizeof(ac_uci_move));
         }
@@ -274,11 +283,17 @@ void loop()
         if (GAME_STATE_STARTED == s_current_game.e_state)
         {
             if (RIGHT_BTN.getCount()) {
-                CLEAR_BOTTOM_MENU();
-                main_client.game_resign(s_current_game.ac_id);
+                if (b_has_moved) {
+                    CLEAR_BOTTOM_MENU();
+                    main_client.game_resign(s_current_game.ac_id);
+                }
             } else if (LEFT_BTN.getCount()) {
-                CLEAR_BOTTOM_MENU();
-                main_client.game_abort(s_current_game.ac_id);
+                if (b_has_moved) {
+                    b_offer_draw = true;
+                } else {
+                    CLEAR_BOTTOM_MENU();
+                    main_client.game_abort(s_current_game.ac_id);
+                }
             }
         }
         else if (s_incoming_challenge.ac_id[0])
@@ -583,7 +598,7 @@ static int poll_events()
                         }
                         memset(s_current_game.ac_moves, 0, sizeof(s_current_game.ac_moves)); // clear starting moves
                         SHOW_OPPONENT("%.17s %c", s_current_game.ac_opponent, s_current_game.b_color ? 'B' : 'W');
-                        SET_BOTTOM_MENU("<-Abort      Resign->");
+                        SET_BOTTOM_MENU("<-Abort");
                         // ignore any incoming challenge
                         memset(&s_incoming_challenge, 0, sizeof(s_incoming_challenge));
                     }

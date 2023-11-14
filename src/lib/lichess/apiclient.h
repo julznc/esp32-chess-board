@@ -71,7 +71,7 @@ public:
     bool api_post(const char *endpoint, const uint8_t *payload=NULL, size_t payload_len=0, cJSON **response=NULL, bool b_debug=true);
 
     // board-api
-    bool game_move(const char *game_id, const char *move_uci);
+    bool game_move(const char *game_id, const char *move_uci, bool draw = false);
     bool game_abort(const char *game_id);
     bool game_resign(const char *game_id);
     bool create_seek(const challenge_st *ps_challenge);
