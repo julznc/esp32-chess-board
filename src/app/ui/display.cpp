@@ -127,7 +127,7 @@ void showBattLevel(void)
         float f_batt = (float)batt / 1000.0f; // mV to V
 
         DISPLAY_TEXT1(95, 0, "%.2fV", f_batt);
-        b_batt_ok   = (batt >= BATT_LEVEL_MIN);
+        b_batt_ok = (batt >= BATT_LEVEL_MIN);
         prev_batt = batt;
 
         if (!b_batt_ok && !b_warned)

@@ -31,6 +31,11 @@ extern "C" void app_main(void)
                 assert(pdTRUE == xTaskCreatePinnedToCore(task##Task, #task, (stack), NULL, (priority), NULL, 0))
 
     RUN_TASK(Ui,        4*1024, 3);
+
+    while (!BATT_OK()) {
+        delayms(100); // pause
+    }
+
     RUN_TASK(Board,     4*1024, 5);
     RUN_TASK(Wifi,      8*1024, 4);
     RUN_TASK(Client,    8*1024, 7);

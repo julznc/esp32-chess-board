@@ -50,6 +50,8 @@ bool init(void)
         led_tx_cfg.loop_count = 0, // no transfer loop
         led_tx_cfg.flags.eot_level = 0;
         init_done = true;
+
+        update();
     }
 
     return init_done;
