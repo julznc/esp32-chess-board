@@ -274,8 +274,8 @@ static inline bool has_piece(void)
 static inline uint8_t read_piece(uint16_t u8_expected_piece, uint8_t u8_retry, bool b_init)
 {
     MFRC522::StatusCode status;
-    uint8_t             buffer[16 + 2]; // minimum
-    uint8_t             size = sizeof(buffer);
+    uint8_t             buffer[16 + 2 /*crc*/]; // minimum
+    uint8_t             size;
 
     if (b_init)
     {
@@ -298,7 +298,8 @@ static inline uint8_t read_piece(uint16_t u8_expected_piece, uint8_t u8_retry, b
             }
         }
     }
-    else if (MFRC522::STATUS_OK != (status = rc522.MIFARE_Read(NTAG_DATA_START_PAGE, buffer, &size)))
+    else if ((16 > (size = sizeof(buffer))) || (MFRC522::STATUS_OK != (status = rc522.MIFARE_Read(0, buffer, &size))) ||
+             (16 > (size = sizeof(buffer))) || (MFRC522::STATUS_OK != (status = rc522.MIFARE_Read(NTAG_DATA_START_PAGE, buffer, &size))))
     {
         if (u8_retry > 0)
         //if ((u8_retry > 0) && ((MFRC522::STATUS_TIMEOUT==status) || (MFRC522::STATUS_CRC_WRONG==status)))

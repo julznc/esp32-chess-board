@@ -46,7 +46,7 @@ bool init(void)
         ESP_ERROR_CHECK(rmt_new_led_strip_encoder(&encoder_cfg, &led_encoder));
         ESP_ERROR_CHECK(rmt_enable(led_channel));
 
-        clear();
+        memset(led_strip_pixels, 0, sizeof(led_strip_pixels));
         led_tx_cfg.loop_count = 0, // no transfer loop
         led_tx_cfg.flags.eot_level = 0;
         init_done = true;
