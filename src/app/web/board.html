@@ -36,9 +36,9 @@
 <script type="text/javascript">
 $(document).ready(function(){
   var board = Chessboard("chessboard", {
-    position: "start",
     pieceTheme: "https://raw.githubusercontent.com/lichess-org/lila/master/public/piece/staunty/{piece}.svg"
   });
+  var prev_fen = null;
 
   $("#btn-flip").click(board.flip);
   $("#label-pgn").click(function() {
@@ -52,6 +52,9 @@ $(document).ready(function(){
       rsp.text().then(function (fen) {
         $("#link-fen").attr("href", "https://lichess.org/analysis/" + fen.replace(' ', '_'))
         $("#txt-fen").val(fen); board.position(fen);
+        if (fen.includes('/') && (prev_fen != fen)) {
+          prev_fen = fen; $("#label-pgn").trigger("click");
+        }
         setTimeout(updateFen, 1500);
       });
     }).catch(function(e) { setTimeout(updateFen, 3000); });
